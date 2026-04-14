@@ -1,5 +1,13 @@
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
+
+function withBase(path) {
+  if (!API_BASE_URL) return path;
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  return `${API_BASE_URL}${path}`;
+}
+
 async function request(path, options = {}) {
-  const res = await fetch(path, {
+  const res = await fetch(withBase(path), {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
@@ -46,7 +54,7 @@ export const adminApi = {
   uploadMedia: async (file) => {
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch("/api/media/upload", {
+    const res = await fetch(withBase("/api/media/upload"), {
       method: "POST",
       credentials: "include",
       body: form,

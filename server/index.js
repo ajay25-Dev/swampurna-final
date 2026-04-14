@@ -16,6 +16,12 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const MEDIA_BUCKET = process.env.SUPABASE_MEDIA_BUCKET || "media";
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+const COOKIE_SAME_SITE = process.env.COOKIE_SAME_SITE || (process.env.NODE_ENV === "production" ? "none" : "lax");
+const COOKIE_SECURE = process.env.COOKIE_SECURE
+  ? process.env.COOKIE_SECURE === "true"
+  : process.env.NODE_ENV === "production";
+
+const allowedOrigins = FRONTEND_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean);
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   // eslint-disable-next-line no-console
@@ -26,7 +32,12 @@ const supabase = createClient(SUPABASE_URL || "", SUPABASE_SERVICE_KEY || "");
 
 app.use(
   cors({
-    origin: FRONTEND_ORIGIN,
+    origin: (origin, callback) => {
+      // allow server-to-server and curl/postman requests without Origin
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error("CORS: Origin not allowed"));
+    },
     credentials: true,
   })
 );
@@ -268,8 +279,8 @@ app.post("/api/auth/login", async (req, res) => {
   const token = signToken(data);
   res.cookie("admin_token", token, {
     httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    sameSite: COOKIE_SAME_SITE,
+    secure: COOKIE_SECURE,
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
