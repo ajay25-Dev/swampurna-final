@@ -1,0 +1,13 @@
+:{$PORT:80} {
+	# Proxy all /api/* requests to the Express backend
+	handle /api/* {
+		reverse_proxy localhost:4000
+	}
+
+	# Serve the Vite build output as static files
+	handle {
+		root * dist
+		try_files {path} /index.html
+		file_server
+	}
+}
