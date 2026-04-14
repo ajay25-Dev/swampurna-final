@@ -348,7 +348,7 @@ const Wrap = styled.div`
 
     aside {
       position: fixed;
-      top: 64px;
+      top: 65px;
       left: 0;
       bottom: 0;
       width: 260px;
