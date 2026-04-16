@@ -1,7 +1,7 @@
 :{$PORT:80} {
 	# Proxy all /api/* requests to the Express backend
 	handle /api/* {
-		reverse_proxy localhost:4000
+		reverse_proxy swampurna-backend.railway.internal:4000
 	}
 
 	# Serve the Vite build output as static files
