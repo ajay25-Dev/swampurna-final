@@ -27,7 +27,33 @@ const COOKIE_SECURE = process.env.COOKIE_SECURE
   ? process.env.COOKIE_SECURE === "true"
   : process.env.NODE_ENV === "production";
 
-const allowedOrigins = FRONTEND_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean);
+function normalizeOrigin(value) {
+  try {
+    const parsed = new URL(value);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return value;
+  }
+}
+
+const allowedOrigins = FRONTEND_ORIGIN.split(",")
+  .map((origin) => normalizeOrigin(origin.trim()))
+  .filter(Boolean);
+
+const wildcardOriginRegexes = allowedOrigins
+  .filter((origin) => origin.includes("*"))
+  .map((origin) => {
+    const escaped = origin
+      .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/\*/g, ".*");
+    return new RegExp(`^${escaped}$`);
+  });
+
+function isOriginAllowed(origin) {
+  const normalizedOrigin = normalizeOrigin(origin);
+  if (allowedOrigins.includes(normalizedOrigin)) return true;
+  return wildcardOriginRegexes.some((regex) => regex.test(normalizedOrigin));
+}
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   // eslint-disable-next-line no-console
@@ -41,7 +67,7 @@ app.use(
     origin: (origin, callback) => {
       // allow server-to-server and curl/postman requests without Origin
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
+      if (isOriginAllowed(origin)) return callback(null, true);
       return callback(new Error("CORS: Origin not allowed"));
     },
     credentials: true,
