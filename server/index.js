@@ -2,6 +2,12 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+import { existsSync } from "fs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import multer from "multer";
@@ -476,6 +482,15 @@ app.post("/api/media/upload", authRequired, upload.single("file"), async (req, r
   const { data } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(filePath);
   return res.json({ url: data.publicUrl, path: filePath });
 });
+
+// Serve React frontend in production
+const distPath = join(__dirname, "../dist");
+if (existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get("*", (req, res) => {
+    res.sendFile(join(distPath, "index.html"));
+  });
+}
 
 app.listen(PORT, () => {
   // eslint-disable-next-line no-console
