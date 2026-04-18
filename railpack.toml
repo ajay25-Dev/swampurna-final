@@ -1,2 +1,2 @@
-[deploy]
-caddyfile = "Caddyfile"
+[providers.node]
+caddy_config_file = "Caddyfile"
