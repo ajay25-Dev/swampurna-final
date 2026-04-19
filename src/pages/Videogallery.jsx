@@ -1,7 +1,67 @@
 import React from 'react';
 import styled from 'styled-components';
+import { useContentItems } from '../hooks/useContentItems';
+
+function getVideoEmbedUrl(url) {
+  const raw = String(url || '').trim();
+  if (!raw) return '';
+
+  if (raw.includes('youtube.com/embed/') || raw.includes('player.vimeo.com/video/') || raw.includes('iframe.mediadelivery.net/embed/')) {
+    return raw;
+  }
+
+  try {
+    const parsed = new URL(raw);
+    const host = parsed.hostname.replace(/^www\./, '');
+
+    if (host === 'youtube.com' || host === 'm.youtube.com') {
+      const videoId = parsed.searchParams.get('v');
+      if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+      if (parsed.pathname.startsWith('/shorts/')) {
+        const shortsId = parsed.pathname.split('/shorts/')[1]?.split('/')[0];
+        if (shortsId) return `https://www.youtube.com/embed/${shortsId}`;
+      }
+      return raw;
+    }
+
+    if (host === 'youtu.be') {
+      const videoId = parsed.pathname.replace('/', '').split('/')[0];
+      if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+      return raw;
+    }
+
+    if (host === 'vimeo.com') {
+      const id = parsed.pathname.replace('/', '').split('/')[0];
+      if (id) return `https://player.vimeo.com/video/${id}`;
+      return raw;
+    }
+
+    return raw;
+  } catch {
+    return raw;
+  }
+}
 
 const Videogallery = () => {
+  const { items } = useContentItems({
+    page: "Videogallery",
+    section: "video_gallery",
+    fallback: [
+      {
+        title: "SWAMPURNA Video",
+        image_url: "https://www.youtube.com/watch?v=xG7LHJ1ySSU",
+        sort_order: 0,
+      },
+    ],
+  });
+
+  const videos = (items || [])
+    .map((item) => ({
+      ...item,
+      embed_url: getVideoEmbedUrl(item.image_url || item.link_url),
+    }))
+    .filter((item) => item.embed_url);
+
   return (
     <PageWrapper>
       {/* Background Decoration */}
@@ -24,21 +84,23 @@ const Videogallery = () => {
       {/* Video Gallery Section */}
       <VideoGallerySection>
         <VideoGrid>
-          <VideoItem>
-            <VideoWrapper>
-              <iframe
-                src="https://www.youtube.com/embed/xG7LHJ1ySSU"
-                title="SWAMPURNA Video"
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="video-iframe"
-              ></iframe>
-            </VideoWrapper>
-            <VideoInfo>
-              <h3 className="video-title">SWAMPURNA Video</h3>
-            </VideoInfo>
-          </VideoItem>
+          {videos.map((video, index) => (
+            <VideoItem key={video.id || `${video.embed_url}-${index}`}>
+              <VideoWrapper>
+                <iframe
+                  src={video.embed_url}
+                  title={video.title || `SWAMPURNA Video ${index + 1}`}
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="video-iframe"
+                ></iframe>
+              </VideoWrapper>
+              <VideoInfo>
+                <h3 className="video-title">{video.title || "SWAMPURNA Video"}</h3>
+              </VideoInfo>
+            </VideoItem>
+          ))}
         </VideoGrid>
       </VideoGallerySection>
     </PageWrapper>

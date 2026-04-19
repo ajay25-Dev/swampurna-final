@@ -1,13 +1,39 @@
-import React from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
+import { useContentItems } from '../hooks/useContentItems';
 import ImpactStoryImg1 from '../assets/images/images1/ImpactStoryimg1.jpg';
 import ImpactStoryImg2 from '../assets/images/images1/ImpactStoryimg2.jpg';
 
 const Impactstory = () => {
-  const stories = [
+  const [expandedCards, setExpandedCards] = useState({});
+
+  const toggleExpanded = (key) => {
+    setExpandedCards((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const toHtml = (content) => {
+    const value = String(content || '');
+    if (!value) return '';
+    if (/<[a-z][\s\S]*>/i.test(value)) return value;
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br/>');
+  };
+
+  const plainText = (content) => String(content || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+
+  const excerpt = (content, limit = 280) => {
+    const text = plainText(content);
+    if (text.length <= limit) return text;
+    return `${text.slice(0, limit)}...`;
+  };
+
+  const fallbackStories = [
     {
       title: "The Shift in the Shack: Nadia, Akhtar, and the Power of Listening",
-      image: ImpactStoryImg1,
+      image_url: ImpactStoryImg1,
       description: `Nadia (29) and Akhtar (34) live in a temporary settlement near a busy construction site. Akhtar spends his days carrying heavy loads, and Nadia manages the home, her fatigue mirroring his own.
 
 The Challenge
@@ -33,11 +59,12 @@ The change was tangible. During a follow-up visit, Nadia beamed as she described
 • Shared Responsibility: Akhtar agreed to engage in meaningful discussions about MHH, transforming their relationship from one of distant silence to one of shared understanding and mutual support.
 
 The conversation had shifted the household dynamic, proving that gender inclusivity is the key to sustainable well-being.`,
-      color: 'primary'
+      tag: 'primary',
+      sort_order: 0
     },
     {
       title: "From Fear to Fact: Komal, Lata, and Medication Awareness",
-      image: ImpactStoryImg2,
+      image_url: ImpactStoryImg2,
       description: `Komal (37) and Lata (26) are neighbors in the same settlement, both mothers who work alongside their husbands. They represent the demographic that often treats menstrual pain with silent endurance or easily available home remedies, fearing expensive medical intervention.
 
 The Challenge
@@ -59,19 +86,32 @@ The women gained confidence and control over their bodies. Komal began keeping a
 "Before, I would just suffer and lose a day's pay. Now, I know what to take and when. I don't feel afraid of my period anymore," said Lata.
 
 This small shift—from ignorance to knowledge about medication—restored their ability to earn a wage and significantly improved their quality of life.`,
-      color: 'secondary'
+      tag: 'secondary',
+      sort_order: 1
     },
     {
       title: "The Next Generation: Samina (9-Year-Old)",
-      image: null,
+      image_url: "",
       description: `Samina (9-Year-Old) is the daughter of a construction worker family. She is our youngest participant and represents the future we are aiming to protect. Our interaction with her family ensures the cycle of silence is broken before menarche even begins.
 
 The Impact
 
 By engaging her mother, Komal, and by participating in our colorful, activity-based sessions, Samina is growing up in an environment where her father and mother are already talking about menstruation scientifically and openly. Her story shows the project's long-term success: breaking the intergenerational transmission of stigma and misinformation.`,
-      color: 'accent'
+      tag: 'accent',
+      sort_order: 2
     }
   ];
+
+  const { items } = useContentItems({
+    page: "Impactstory",
+    section: "impact_articles",
+    fallback: fallbackStories,
+  });
+
+  const stories = (items || []).map((story) => ({
+    ...story,
+    color: story.tag || 'primary',
+  }));
 
   return (
     <PageWrapper>
@@ -94,19 +134,36 @@ By engaging her mother, Komal, and by participating in our colorful, activity-ba
 
       {/* Stories Grid */}
       <StoriesGrid>
-        {stories.map((story, index) => (
-          <StoryCard key={index} className={`color-${story.color}`}>
-            {story.image && (
-              <div className="story-image">
-                <img src={story.image} alt={story.title} />
+        {stories.map((story, index) => {
+          const key = story.id || index;
+          const isExpanded = !!expandedCards[key];
+          const showMoreNeeded = plainText(story.description).length > 280;
+          return (
+            <StoryCard key={key} className={`color-${story.color}`}>
+              {story.image_url && (
+                <div className="story-image">
+                  <img src={story.image_url} alt={story.title} />
+                </div>
+              )}
+              <div className="story-content">
+                <h3 className="story-title">{story.title}</h3>
+                {isExpanded ? (
+                  <div
+                    className="story-description"
+                    dangerouslySetInnerHTML={{ __html: toHtml(story.description) }}
+                  />
+                ) : (
+                  <p className="story-description">{excerpt(story.description)}</p>
+                )}
+                {showMoreNeeded && (
+                  <button type="button" className="show-more-btn" onClick={() => toggleExpanded(key)}>
+                    {isExpanded ? 'Show Less' : 'Show More'}
+                  </button>
+                )}
               </div>
-            )}
-            <div className="story-content">
-              <h3 className="story-title">{story.title}</h3>
-              <p className="story-description">{story.description}</p>
-            </div>
-          </StoryCard>
-        ))}
+            </StoryCard>
+          );
+        })}
       </StoriesGrid>
     </PageWrapper>
   );
@@ -278,6 +335,31 @@ const StoryCard = styled.article`
     color: var(--color-dark-600);
     line-height: 1.8;
     margin: 0;
+    white-space: normal;
+  }
+
+  .story-description p {
+    margin: 0 0 var(--space-3);
+  }
+
+  .story-description ul,
+  .story-description ol {
+    margin: 0 0 var(--space-3) var(--space-5);
+  }
+
+  .story-description strong {
+    color: var(--color-dark-800);
+  }
+
+  .show-more-btn {
+    margin-top: var(--space-1);
+    padding: 8px 14px;
+    border-radius: var(--radius-full);
+    background: var(--color-primary-50);
+    color: var(--color-primary-700);
+    border: 1px solid var(--color-primary-100);
+    font-size: 0.88rem;
+    font-weight: 600;
   }
 
   @media (max-width: 768px) {

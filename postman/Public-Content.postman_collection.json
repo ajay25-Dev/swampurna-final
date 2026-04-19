@@ -1,0 +1,174 @@
+{
+  "info": {
+    "_postman_id": "2fd9f8ae-b69a-4fa4-9f7f-3d137a8cde64",
+    "name": "Swampurna Public Content APIs",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Ready-to-import collection for public content endpoints (news, competition events, photo gallery, video gallery)."
+  },
+  "item": [
+    {
+      "name": "News - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/public/newsarticles",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "public",
+            "newsarticles"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test(\"Has data array\", function () {",
+              "  pm.expect(Array.isArray(json.data)).to.eql(true);",
+              "});",
+              "if (json.data && json.data.length > 0 && json.data[0].slug) {",
+              "  pm.collectionVariables.set(\"newsSlug\", json.data[0].slug);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "News - Detail By Slug",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/public/newsarticles/{{newsSlug}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "public",
+            "newsarticles",
+            "{{newsSlug}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Competition Events - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/public/compitionevents",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "public",
+            "compitionevents"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "pm.test(\"Has data array\", function () {",
+              "  pm.expect(Array.isArray(json.data)).to.eql(true);",
+              "});",
+              "if (json.data && json.data.length > 0 && json.data[0].slug) {",
+              "  pm.collectionVariables.set(\"eventSlug\", json.data[0].slug);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Competition Events - Detail By Slug",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/public/compitionevents/{{eventSlug}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "public",
+            "compitionevents",
+            "{{eventSlug}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Photo Gallery - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/public/photogallery",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "public",
+            "photogallery"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Video Gallery - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/public/videogallery",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "public",
+            "videogallery"
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000"
+    },
+    {
+      "key": "newsSlug",
+      "value": ""
+    },
+    {
+      "key": "eventSlug",
+      "value": ""
+    }
+  ]
+}

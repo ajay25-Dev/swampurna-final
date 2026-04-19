@@ -55,6 +55,88 @@ function isOriginAllowed(origin) {
   return wildcardOriginRegexes.some((regex) => regex.test(normalizedOrigin));
 }
 
+function slugify(value = "") {
+  return String(value)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+}
+
+function buildNewsSlug(item, index = 0) {
+  if (item?.meta?.slug) return item.meta.slug;
+  const base = slugify(item?.title) || `article-${index + 1}`;
+  if (item?.id) {
+    const shortId = String(item.id).split("-")[0];
+    return `${base}-${shortId}`;
+  }
+  return base;
+}
+
+function buildEventSlug(item, index = 0) {
+  if (item?.meta?.slug) return item.meta.slug;
+  const base = slugify(item?.title) || `event-${index + 1}`;
+  if (item?.id) {
+    const shortId = String(item.id).split("-")[0];
+    return `${base}-${shortId}`;
+  }
+  return base;
+}
+
+async function uploadBufferToMediaBucket(file) {
+  const fileExt = file.originalname.split(".").pop();
+  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+  const filePath = `${fileName}`;
+
+  const { error } = await supabase.storage
+    .from(MEDIA_BUCKET)
+    .upload(filePath, file.buffer, {
+      contentType: file.mimetype,
+      upsert: false,
+    });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const { data } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(filePath);
+  return { url: data.publicUrl, path: filePath };
+}
+
+async function getPostCounts(postIds = []) {
+  if (!postIds.length) {
+    return { likeCounts: {}, commentCounts: {} };
+  }
+
+  const { data: likesData, error: likesError } = await supabase
+    .from("post_likes")
+    .select("post_id")
+    .in("post_id", postIds);
+  if (likesError) throw new Error(likesError.message);
+
+  const { data: commentsData, error: commentsError } = await supabase
+    .from("post_comments")
+    .select("post_id")
+    .in("post_id", postIds);
+  if (commentsError) throw new Error(commentsError.message);
+
+  const likeCounts = {};
+  const commentCounts = {};
+  for (const id of postIds) {
+    likeCounts[id] = 0;
+    commentCounts[id] = 0;
+  }
+  for (const like of likesData || []) {
+    likeCounts[like.post_id] = (likeCounts[like.post_id] || 0) + 1;
+  }
+  for (const comment of commentsData || []) {
+    commentCounts[comment.post_id] = (commentCounts[comment.post_id] || 0) + 1;
+  }
+
+  return { likeCounts, commentCounts };
+}
+
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   // eslint-disable-next-line no-console
   console.warn("Missing SUPABASE_URL or SUPABASE_SERVICE_KEY in .env.server");
@@ -67,8 +149,11 @@ app.use(
     origin: (origin, callback) => {
       // allow server-to-server and curl/postman requests without Origin
       if (!origin) return callback(null, true);
-      if (isOriginAllowed(origin)) return callback(null, true);
-      return callback(new Error("CORS: Origin not allowed"));
+      try {
+        return callback(null, isOriginAllowed(origin));
+      } catch {
+        return callback(null, false);
+      }
     },
     credentials: true,
   })
@@ -115,6 +200,9 @@ function authRequired(req, res, next) {
   }
   try {
     const payload = jwt.verify(token, JWT_SECRET);
+    if (payload.role !== "admin") {
+      return res.status(403).json({ error: "You are not an admin." });
+    }
     req.user = payload;
     return next();
   } catch (err) {
@@ -122,8 +210,152 @@ function authRequired(req, res, next) {
   }
 }
 
+function apiAuthOptional(req, _res, next) {
+  const token = extractBearerToken(req) || req.cookies.admin_token;
+  if (!token) {
+    req.user = null;
+    return next();
+  }
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+  } catch {
+    req.user = null;
+  }
+  return next();
+}
+
 app.get("/api/health", (req, res) => {
   res.json({ ok: true });
+});
+
+app.get("/api/public/newsarticles", async (req, res) => {
+  const { data, error } = await supabase
+    .from("content_items")
+    .select("*")
+    .eq("page_slug", "Newsarticles")
+    .eq("section_key", "news_articles")
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const articles = (data || []).map((item, index) => ({
+    ...item,
+    slug: buildNewsSlug(item, index),
+  }));
+
+  return res.json({ data: articles });
+});
+
+app.get("/api/public/newsarticles/:slug", async (req, res) => {
+  const targetSlug = String(req.params.slug || "").trim().toLowerCase();
+  if (!targetSlug) {
+    return res.status(400).json({ error: "Slug is required" });
+  }
+
+  const { data, error } = await supabase
+    .from("content_items")
+    .select("*")
+    .eq("page_slug", "Newsarticles")
+    .eq("section_key", "news_articles")
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const articles = (data || []).map((item, index) => ({
+    ...item,
+    slug: buildNewsSlug(item, index),
+  }));
+  const article = articles.find((item) => item.slug.toLowerCase() === targetSlug);
+
+  if (!article) {
+    return res.status(404).json({ error: "Article not found" });
+  }
+
+  return res.json({ data: article });
+});
+
+app.get("/api/public/compitionevents", async (req, res) => {
+  const { data, error } = await supabase
+    .from("content_items")
+    .select("*")
+    .eq("page_slug", "Compitionevent")
+    .eq("section_key", "competition_events")
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const events = (data || []).map((item, index) => ({
+    ...item,
+    slug: buildEventSlug(item, index),
+  }));
+
+  return res.json({ data: events });
+});
+
+app.get("/api/public/compitionevents/:slug", async (req, res) => {
+  const targetSlug = String(req.params.slug || "").trim().toLowerCase();
+  if (!targetSlug) {
+    return res.status(400).json({ error: "Slug is required" });
+  }
+
+  const { data, error } = await supabase
+    .from("content_items")
+    .select("*")
+    .eq("page_slug", "Compitionevent")
+    .eq("section_key", "competition_events")
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const events = (data || []).map((item, index) => ({
+    ...item,
+    slug: buildEventSlug(item, index),
+  }));
+  const event = events.find((item) => item.slug.toLowerCase() === targetSlug);
+
+  if (!event) {
+    return res.status(404).json({ error: "Event not found" });
+  }
+
+  return res.json({ data: event });
+});
+
+app.get("/api/public/photogallery", async (req, res) => {
+  const { data, error } = await supabase
+    .from("content_items")
+    .select("*")
+    .eq("page_slug", "Photogallery")
+    .eq("section_key", "gallery_images")
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  return res.json({ data: data || [] });
+});
+
+app.get("/api/public/videogallery", async (req, res) => {
+  const { data, error } = await supabase
+    .from("content_items")
+    .select("*")
+    .eq("page_slug", "Videogallery")
+    .eq("section_key", "video_gallery")
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  return res.json({ data: data || [] });
 });
 
 app.post("/api/v1/auth/register", async (req, res) => {
@@ -286,6 +518,248 @@ app.post("/api/v1/auth/pin/verify", apiAuthRequired, async (req, res) => {
   return res.json({ verified: true });
 });
 
+app.post("/api/v1/posts/media/upload", apiAuthRequired, upload.single("file"), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded" });
+  }
+  if (!String(req.file.mimetype || "").startsWith("image/")) {
+    return res.status(400).json({ error: "Only image files are allowed" });
+  }
+  try {
+    const result = await uploadBufferToMediaBucket(req.file);
+    return res.json(result);
+  } catch (err) {
+    return res.status(400).json({ error: err.message || "Upload failed" });
+  }
+});
+
+app.post("/api/v1/posts", apiAuthRequired, async (req, res) => {
+  const { title, content, image_url } = req.body || {};
+  const cleanContent = String(content || "").trim();
+  if (!cleanContent) {
+    return res.status(400).json({ error: "Content is required" });
+  }
+
+  const payload = {
+    user_id: req.user.id,
+    title: title ? String(title).trim() : null,
+    content: cleanContent,
+    image_url: image_url ? String(image_url).trim() : null,
+    status: "published",
+  };
+
+  const { data, error } = await supabase
+    .from("posts")
+    .insert(payload)
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to create post" });
+  }
+
+  return res.json({ data: { ...data, like_count: 0, comment_count: 0, liked_by_me: false } });
+});
+
+app.get("/api/v1/posts", apiAuthOptional, async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+
+  const { data: posts, error } = await supabase
+    .from("posts")
+    .select("*")
+    .eq("status", "published")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const postIds = (posts || []).map((p) => p.id);
+  const { likeCounts, commentCounts } = await getPostCounts(postIds).catch((err) => ({
+    likeCounts: {},
+    commentCounts: {},
+    countsError: err.message,
+  }));
+
+  let likedByMeSet = new Set();
+  if (req.user?.id && postIds.length) {
+    const { data: myLikes } = await supabase
+      .from("post_likes")
+      .select("post_id")
+      .eq("user_id", req.user.id)
+      .in("post_id", postIds);
+    likedByMeSet = new Set((myLikes || []).map((row) => row.post_id));
+  }
+
+  const userIds = Array.from(new Set((posts || []).map((p) => p.user_id).filter(Boolean)));
+  let usersMap = {};
+  if (userIds.length) {
+    const { data: usersData } = await supabase
+      .from("users")
+      .select("id, email, role")
+      .in("id", userIds);
+    usersMap = Object.fromEntries((usersData || []).map((u) => [u.id, u]));
+  }
+
+  const formatted = (posts || []).map((post) => ({
+    ...post,
+    author: usersMap[post.user_id] || null,
+    like_count: likeCounts[post.id] || 0,
+    comment_count: commentCounts[post.id] || 0,
+    liked_by_me: likedByMeSet.has(post.id),
+  }));
+
+  return res.json({ data: formatted, meta: { limit, offset } });
+});
+
+app.get("/api/v1/posts/:id", apiAuthOptional, async (req, res) => {
+  const { id } = req.params;
+  const { data: post, error } = await supabase
+    .from("posts")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error || !post) {
+    return res.status(404).json({ error: "Post not found" });
+  }
+
+  const { likeCounts, commentCounts } = await getPostCounts([post.id]).catch(() => ({
+    likeCounts: {},
+    commentCounts: {},
+  }));
+
+  let likedByMe = false;
+  if (req.user?.id) {
+    const { data: myLike } = await supabase
+      .from("post_likes")
+      .select("post_id")
+      .eq("post_id", post.id)
+      .eq("user_id", req.user.id)
+      .maybeSingle();
+    likedByMe = !!myLike;
+  }
+
+  const { data: author } = await supabase
+    .from("users")
+    .select("id, email, role")
+    .eq("id", post.user_id)
+    .maybeSingle();
+
+  return res.json({
+    data: {
+      ...post,
+      author: author || null,
+      like_count: likeCounts[post.id] || 0,
+      comment_count: commentCounts[post.id] || 0,
+      liked_by_me: likedByMe,
+    },
+  });
+});
+
+app.post("/api/v1/posts/:id/like", apiAuthRequired, async (req, res) => {
+  const { id } = req.params;
+  const { data: post } = await supabase.from("posts").select("id").eq("id", id).maybeSingle();
+  if (!post) {
+    return res.status(404).json({ error: "Post not found" });
+  }
+
+  const { data: existingLike } = await supabase
+    .from("post_likes")
+    .select("post_id")
+    .eq("post_id", id)
+    .eq("user_id", req.user.id)
+    .maybeSingle();
+
+  if (existingLike) {
+    const { error: deleteError } = await supabase
+      .from("post_likes")
+      .delete()
+      .eq("post_id", id)
+      .eq("user_id", req.user.id);
+    if (deleteError) {
+      return res.status(400).json({ error: deleteError.message });
+    }
+  } else {
+    const { error: insertError } = await supabase
+      .from("post_likes")
+      .insert({ post_id: id, user_id: req.user.id });
+    if (insertError) {
+      return res.status(400).json({ error: insertError.message });
+    }
+  }
+
+  const { likeCounts } = await getPostCounts([id]).catch(() => ({ likeCounts: {} }));
+  return res.json({
+    data: {
+      post_id: id,
+      liked: !existingLike,
+      like_count: likeCounts[id] || 0,
+    },
+  });
+});
+
+app.get("/api/v1/posts/:id/comments", async (req, res) => {
+  const { id } = req.params;
+  const { data, error } = await supabase
+    .from("post_comments")
+    .select("*")
+    .eq("post_id", id)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const userIds = Array.from(new Set((data || []).map((c) => c.user_id).filter(Boolean)));
+  let usersMap = {};
+  if (userIds.length) {
+    const { data: usersData } = await supabase
+      .from("users")
+      .select("id, email, role")
+      .in("id", userIds);
+    usersMap = Object.fromEntries((usersData || []).map((u) => [u.id, u]));
+  }
+
+  const comments = (data || []).map((comment) => ({
+    ...comment,
+    author: usersMap[comment.user_id] || null,
+  }));
+
+  return res.json({ data: comments });
+});
+
+app.post("/api/v1/posts/:id/comments", apiAuthRequired, async (req, res) => {
+  const { id } = req.params;
+  const content = String(req.body?.content || "").trim();
+  if (!content) {
+    return res.status(400).json({ error: "Comment content is required" });
+  }
+
+  const { data: post } = await supabase.from("posts").select("id").eq("id", id).maybeSingle();
+  if (!post) {
+    return res.status(404).json({ error: "Post not found" });
+  }
+
+  const { data, error } = await supabase
+    .from("post_comments")
+    .insert({
+      post_id: id,
+      user_id: req.user.id,
+      content,
+    })
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to add comment" });
+  }
+
+  return res.json({ data });
+});
+
 app.post("/api/auth/login", async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) {
@@ -306,6 +780,9 @@ app.post("/api/auth/login", async (req, res) => {
   const passwordOk = await bcrypt.compare(password, data.password_hash);
   if (!passwordOk) {
     return res.status(401).json({ error: "Invalid credentials" });
+  }
+  if (data.role !== "admin") {
+    return res.status(403).json({ error: "You are not an admin." });
   }
 
   const token = signToken(data);

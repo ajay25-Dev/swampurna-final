@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import { FiX, FiZoomIn } from 'react-icons/fi';
+import { useContentItems } from '../hooks/useContentItems';
 
 // Import all gallery images
 import Picture1 from '../assets/images/gallery/Picture1.jpg';
@@ -39,12 +40,25 @@ import Picture32 from '../assets/images/gallery/Picture32.jpg';
 const Photogallery = () => {
   const [selectedImage, setSelectedImage] = useState(null);
 
-  const images = [
+  const fallbackImages = [
     Picture1, Picture2, Picture3, Picture4, Picture5, Picture6, Picture7, Picture8,
     Picture9, Picture10, Picture11, Picture12, Picture13, Picture14, Picture15, Picture16,
     Picture17, Picture18, Picture19, Picture20, Picture21, Picture22, Picture23, Picture24,
     Picture25, Picture26, Picture27, Picture28, Picture29, Picture30, Picture31, Picture32
   ];
+
+  const { items } = useContentItems({
+    page: "Photogallery",
+    section: "gallery_images",
+    fallback: fallbackImages.map((image, index) => ({
+      image_url: image,
+      sort_order: index,
+    })),
+  });
+
+  const images = (items || [])
+    .map((item) => item.image_url)
+    .filter(Boolean);
 
   const openModal = (image) => {
     setSelectedImage(image);
