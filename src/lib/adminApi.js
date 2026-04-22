@@ -71,4 +71,25 @@ export const adminApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  getSupportReports: ({ status = "", limit = 50, offset = 0 } = {}) =>
+    request(
+      `/api/v1/support/reports?status=${encodeURIComponent(status)}&limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`
+    ),
+  updateSupportReport: (id, payload) =>
+    request(`/api/v1/support/reports/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  getCycleSnaps: ({ status = "", limit = 50, offset = 0 } = {}) =>
+    request(
+      `/api/v1/cycle-snaps?status=${encodeURIComponent(status)}&limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`
+    ),
+  updateCycleSnapStatus: (id, status) =>
+    request(`/api/v1/cycle-snaps/${id}/status`, {
+      method: "PUT",
+      body: JSON.stringify({ status }),
+    }),
+  getTrackerUsers: () => request("/api/admin/period-tracker/users"),
+  getTrackerUserDetails: (userId, month = "") =>
+    request(`/api/admin/period-tracker/user/${encodeURIComponent(userId)}/details?month=${encodeURIComponent(month)}`),
 };

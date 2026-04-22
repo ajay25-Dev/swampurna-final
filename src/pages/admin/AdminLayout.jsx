@@ -88,6 +88,15 @@ const AdminLayout = ({ children }) => {
             <NavLink to="/admin/customers" className="nav-link" onClick={() => setSidebarOpen(false)}>
               Customers
             </NavLink>
+            <NavLink to="/admin/support-reports" className="nav-link" onClick={() => setSidebarOpen(false)}>
+              Support Reports
+            </NavLink>
+            <NavLink to="/admin/cycle-snaps" className="nav-link" onClick={() => setSidebarOpen(false)}>
+              Cycle Snaps
+            </NavLink>
+            <NavLink to="/admin/tracker-details" className="nav-link" onClick={() => setSidebarOpen(false)}>
+              Tracker Details
+            </NavLink>
             <NavLink style={{ marginBottom:"10px" }} to="/admin/pages/Home" className="nav-link" onClick={() => setSidebarOpen(false)}>
               Home Banner
             </NavLink>
