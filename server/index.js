@@ -12,6 +12,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
+import nodemailer from "nodemailer";
 
 dotenv.config({ path: "server/.env.server" });
 
@@ -22,6 +23,12 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const MEDIA_BUCKET = process.env.SUPABASE_MEDIA_BUCKET || "media";
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+const OTP_TTL_MINUTES = Math.max(Number(process.env.OTP_TTL_MINUTES) || 10, 1);
+const SMTP_HOST = process.env.SMTP_HOST || "";
+const SMTP_PORT = Number(process.env.SMTP_PORT) || 587;
+const SMTP_USER = process.env.SMTP_USER || "";
+const SMTP_PASS = process.env.SMTP_PASS || "";
+const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER || "";
 const COOKIE_SAME_SITE = process.env.COOKIE_SAME_SITE || (process.env.NODE_ENV === "production" ? "none" : "lax");
 const COOKIE_SECURE = process.env.COOKIE_SECURE
   ? process.env.COOKIE_SECURE === "true"
@@ -255,6 +262,95 @@ function deriveAdaptiveCycleMetricsFromLogs(logs = []) {
 function normalizeSymptomArray(value) {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.map((item) => String(item || "").trim()).filter(Boolean))];
+}
+
+function generateOtp4() {
+  return String(Math.floor(1000 + Math.random() * 9000));
+}
+
+function getOtpExpiryIso() {
+  return new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000).toISOString();
+}
+
+async function sendOtpEmail({ to, otp }) {
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS || !SMTP_FROM) {
+    throw new Error("SMTP is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM");
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_PORT === 465,
+    auth: {
+      user: SMTP_USER,
+      pass: SMTP_PASS,
+    },
+  });
+
+  const subject = "Your Swampurna OTP Code";
+  const text = `Your OTP is ${otp}. It expires in ${OTP_TTL_MINUTES} minutes. If you did not request this code, please ignore this email.`;
+  const html = `
+    <!doctype html>
+    <html lang="en">
+      <body style="margin:0;padding:0;background:#f1f6fb;font-family:Arial,sans-serif;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="padding:28px 12px;">
+          <tr>
+            <td align="center">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:620px;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #d9e5f2;">
+                <tr>
+                  <td style="background:linear-gradient(90deg,#0f4b8a,#0d77be);padding:20px 26px;color:#ffffff;">
+                    <div style="font-size:21px;font-weight:700;letter-spacing:.3px;">Swampurna</div>
+                    <div style="font-size:13px;opacity:.9;margin-top:4px;">Secure Login Verification</div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:28px 26px 14px;">
+                    <div style="font-size:22px;line-height:1.35;color:#0f172a;font-weight:700;">Your OTP Code</div>
+                    <p style="margin:10px 0 0;font-size:15px;line-height:1.6;color:#334155;">
+                      Use the code below to complete your sign-in.
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 26px 6px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f8fbff;border:1px solid #dbe7f4;border-radius:12px;">
+                      <tr>
+                        <td align="center" style="padding:20px 12px;">
+                          <div style="font-size:34px;letter-spacing:8px;font-weight:800;color:#0d77be;">${otp}</div>
+                          <div style="margin-top:8px;font-size:13px;color:#64748b;">Valid for ${OTP_TTL_MINUTES} minutes</div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 26px 10px;">
+                    <p style="margin:0;font-size:13px;line-height:1.7;color:#64748b;">
+                      For your security, do not share this code with anyone.
+                      If you did not request this OTP, you can safely ignore this email.
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 26px 24px;border-top:1px solid #edf2f7;">
+                    <div style="font-size:12px;color:#94a3b8;">This is an automated message from Swampurna.</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
+  `;
+
+  await transporter.sendMail({
+    from: SMTP_FROM,
+    to,
+    subject,
+    text,
+    html,
+  });
 }
 
 function isValidReminderType(value) {
@@ -795,6 +891,153 @@ app.post("/api/v1/auth/register", async (req, res) => {
 
   const token = signToken(user);
   return res.json({
+    token,
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      is_active: user.is_active,
+      pin_enabled: !!user.pin_enabled,
+    },
+  });
+});
+
+app.post("/api/v1/auth/otp/send", async (req, res) => {
+  const { email, purpose } = req.body || {};
+  if (!email) {
+    return res.status(400).json({ error: "email is required" });
+  }
+  const cleanEmail = String(email).trim().toLowerCase();
+  const cleanPurpose = purpose ? String(purpose).trim().toLowerCase() : "login";
+
+  const { data: user, error: userError } = await supabase
+    .from("users")
+    .select("id, email, role, is_active")
+    .eq("email", cleanEmail)
+    .maybeSingle();
+  if (userError) return res.status(400).json({ error: userError.message });
+  if (!user || !user.is_active) {
+    return res.status(404).json({ error: "User not found or inactive" });
+  }
+
+  const otp = generateOtp4();
+  const otp_hash = await bcrypt.hash(otp, 10);
+  const expires_at = getOtpExpiryIso();
+
+  await supabase
+    .from("otp_verify")
+    .update({ is_active: false })
+    .eq("email", cleanEmail)
+    .eq("purpose", cleanPurpose)
+    .eq("verified", false);
+
+  const { data, error } = await supabase
+    .from("otp_verify")
+    .insert({
+      user_id: user.id,
+      email: cleanEmail,
+      purpose: cleanPurpose,
+      otp_hash,
+      expires_at,
+      verified: false,
+      is_active: true,
+      attempts: 0,
+    })
+    .select("id, email, purpose, expires_at, created_at")
+    .single();
+
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to create OTP" });
+  }
+
+  try {
+    await sendOtpEmail({ to: cleanEmail, otp });
+  } catch (mailError) {
+    await supabase.from("otp_verify").update({ is_active: false }).eq("id", data.id);
+    return res.status(400).json({ error: mailError.message || "Failed to send OTP email" });
+  }
+
+  return res.json({
+    data: {
+      otp_id: data.id,
+      email: data.email,
+      purpose: data.purpose,
+      expires_at: data.expires_at,
+    },
+    message: "OTP sent successfully",
+  });
+});
+
+app.post("/api/v1/auth/otp/verify", async (req, res) => {
+  const { email, otp, purpose } = req.body || {};
+  if (!email || !otp) {
+    return res.status(400).json({ error: "email and otp are required" });
+  }
+  const cleanEmail = String(email).trim().toLowerCase();
+  const cleanPurpose = purpose ? String(purpose).trim().toLowerCase() : "login";
+  const cleanOtp = String(otp).trim();
+  if (!/^\d{4}$/.test(cleanOtp)) {
+    return res.status(400).json({ error: "otp must be exactly 4 digits" });
+  }
+
+  const { data: otpRow, error: otpError } = await supabase
+    .from("otp_verify")
+    .select("*")
+    .eq("email", cleanEmail)
+    .eq("purpose", cleanPurpose)
+    .eq("verified", false)
+    .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (otpError) {
+    return res.status(400).json({ error: otpError.message });
+  }
+  if (!otpRow) {
+    return res.status(400).json({ error: "OTP not found. Request a new OTP." });
+  }
+  if (new Date(otpRow.expires_at).getTime() < Date.now()) {
+    await supabase.from("otp_verify").update({ is_active: false }).eq("id", otpRow.id);
+    return res.status(400).json({ error: "OTP expired. Request a new OTP." });
+  }
+  if ((otpRow.attempts || 0) >= 5) {
+    await supabase.from("otp_verify").update({ is_active: false }).eq("id", otpRow.id);
+    return res.status(400).json({ error: "OTP blocked after too many attempts. Request a new OTP." });
+  }
+
+  const matched = await bcrypt.compare(cleanOtp, otpRow.otp_hash);
+  if (!matched) {
+    await supabase
+      .from("otp_verify")
+      .update({ attempts: (otpRow.attempts || 0) + 1 })
+      .eq("id", otpRow.id);
+    return res.status(401).json({ error: "Invalid OTP" });
+  }
+
+  const { data: user, error: userError } = await supabase
+    .from("users")
+    .select("*")
+    .eq("email", cleanEmail)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (userError || !user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  await supabase
+    .from("otp_verify")
+    .update({
+      verified: true,
+      verified_at: new Date().toISOString(),
+      is_active: false,
+      attempts: (otpRow.attempts || 0) + 1,
+    })
+    .eq("id", otpRow.id);
+
+  const token = signToken(user);
+  return res.json({
+    verified: true,
     token,
     user: {
       id: user.id,

@@ -105,6 +105,85 @@
       ]
     },
     {
+      "name": "2A. Send OTP",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"purpose\": \"login\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/otp/send",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "otp",
+            "send"
+          ]
+        },
+        "description": "Send 4-digit OTP to email and save in otp_verify table."
+      },
+      "response": []
+    },
+    {
+      "name": "2B. Verify OTP (Login)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"otp\": \"{{otp}}\",\n  \"purpose\": \"login\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/otp/verify",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "otp",
+            "verify"
+          ]
+        },
+        "description": "Verify OTP and receive JWT token."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const json = pm.response.json();",
+              "if (json.token) { pm.collectionVariables.set('token', json.token); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "3. Me",
       "request": {
         "method": "GET",
@@ -257,6 +336,14 @@
     },
     {
       "key": "token",
+      "value": ""
+    },
+    {
+      "key": "email",
+      "value": "customer1@test.com"
+    },
+    {
+      "key": "otp",
       "value": ""
     }
   ]
