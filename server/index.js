@@ -24,6 +24,11 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const MEDIA_BUCKET = process.env.SUPABASE_MEDIA_BUCKET || "media";
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 const OTP_TTL_MINUTES = Math.max(Number(process.env.OTP_TTL_MINUTES) || 10, 1);
+const OTP_RESEND_COOLDOWN_SECONDS = Math.max(Number(process.env.OTP_RESEND_COOLDOWN_SECONDS) || 60, 10);
+const OTP_SEND_MAX_PER_WINDOW = Math.max(Number(process.env.OTP_SEND_MAX_PER_WINDOW) || 5, 1);
+const OTP_VERIFY_MAX_PER_WINDOW = Math.max(Number(process.env.OTP_VERIFY_MAX_PER_WINDOW) || 10, 1);
+const PIN_LOGIN_MAX_PER_WINDOW = Math.max(Number(process.env.PIN_LOGIN_MAX_PER_WINDOW) || 10, 1);
+const AUTH_RATE_WINDOW_MS = Math.max(Number(process.env.AUTH_RATE_WINDOW_MS) || 15 * 60 * 1000, 60 * 1000);
 const SMTP_HOST = process.env.SMTP_HOST || "";
 const SMTP_PORT = Number(process.env.SMTP_PORT) || 587;
 const SMTP_USER = process.env.SMTP_USER || "";
@@ -61,6 +66,8 @@ function isOriginAllowed(origin) {
   if (allowedOrigins.includes(normalizedOrigin)) return true;
   return wildcardOriginRegexes.some((regex) => regex.test(normalizedOrigin));
 }
+
+const authRateState = new Map();
 
 function slugify(value = "") {
   return String(value)
@@ -264,6 +271,29 @@ function normalizeSymptomArray(value) {
   return [...new Set(value.map((item) => String(item || "").trim()).filter(Boolean))];
 }
 
+function getClientIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.trim()) {
+    return forwarded.split(",")[0].trim();
+  }
+  return req.ip || "unknown";
+}
+
+function consumeAuthRateLimit({ key, limit, windowMs, now = Date.now() }) {
+  const bucket = authRateState.get(key);
+  if (!bucket || now > bucket.resetAt) {
+    authRateState.set(key, { count: 1, resetAt: now + windowMs });
+    return { allowed: true, remaining: limit - 1, retryAfterSeconds: 0 };
+  }
+  if (bucket.count >= limit) {
+    const retryAfterSeconds = Math.max(Math.ceil((bucket.resetAt - now) / 1000), 1);
+    return { allowed: false, remaining: 0, retryAfterSeconds };
+  }
+  bucket.count += 1;
+  authRateState.set(key, bucket);
+  return { allowed: true, remaining: Math.max(limit - bucket.count, 0), retryAfterSeconds: 0 };
+}
+
 function generateOtp4() {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
@@ -351,6 +381,50 @@ async function sendOtpEmail({ to, otp }) {
     text,
     html,
   });
+}
+
+async function createAndSendOtpForUser({ user, purpose = "login" }) {
+  const cleanEmail = String(user.email).trim().toLowerCase();
+  const cleanPurpose = String(purpose || "login").trim().toLowerCase();
+
+  const otp = generateOtp4();
+  const otp_hash = await bcrypt.hash(otp, 10);
+  const expires_at = getOtpExpiryIso();
+
+  await supabase
+    .from("otp_verify")
+    .update({ is_active: false })
+    .eq("email", cleanEmail)
+    .eq("purpose", cleanPurpose)
+    .eq("verified", false);
+
+  const { data, error } = await supabase
+    .from("otp_verify")
+    .insert({
+      user_id: user.id,
+      email: cleanEmail,
+      purpose: cleanPurpose,
+      otp_hash,
+      expires_at,
+      verified: false,
+      is_active: true,
+      attempts: 0,
+    })
+    .select("id, email, purpose, expires_at, created_at")
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message || "Failed to create OTP");
+  }
+
+  try {
+    await sendOtpEmail({ to: cleanEmail, otp });
+  } catch (mailError) {
+    await supabase.from("otp_verify").update({ is_active: false }).eq("id", data.id);
+    throw new Error(mailError.message || "Failed to send OTP email");
+  }
+
+  return data;
 }
 
 function isValidReminderType(value) {
@@ -849,12 +923,9 @@ app.get("/api/public/videogallery", async (req, res) => {
 });
 
 app.post("/api/v1/auth/register", async (req, res) => {
-  const { email, password, role } = req.body || {};
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email and password are required" });
-  }
-  if (String(password).length < 6) {
-    return res.status(400).json({ error: "Password must be at least 6 characters" });
+  const { email, password, role, name, phone } = req.body || {};
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
   }
 
   const cleanEmail = String(email).trim().toLowerCase();
@@ -873,7 +944,11 @@ app.post("/api/v1/auth/register", async (req, res) => {
     return res.status(400).json({ error: "Email already registered" });
   }
 
-  const password_hash = await bcrypt.hash(String(password), 10);
+  const finalPasswordValue = password ? String(password) : `otp-only-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  if (password && String(password).length < 6) {
+    return res.status(400).json({ error: "Password must be at least 6 characters" });
+  }
+  const password_hash = await bcrypt.hash(finalPasswordValue, 10);
   const { data: user, error } = await supabase
     .from("users")
     .insert({
@@ -889,6 +964,27 @@ app.post("/api/v1/auth/register", async (req, res) => {
     return res.status(400).json({ error: error?.message || "Failed to register" });
   }
 
+  let customer = null;
+  if (cleanRole === "customer") {
+    const fallbackName = cleanEmail.split("@")[0] || "Customer";
+    const { data: customerData, error: customerError } = await supabase
+      .from("customers")
+      .insert({
+        user_id: user.id,
+        name: name ? String(name).trim() : fallbackName,
+        phone: phone ? String(phone).trim() : null,
+        status: "new",
+      })
+      .select("*")
+      .single();
+
+    if (customerError || !customerData) {
+      await supabase.from("users").delete().eq("id", user.id);
+      return res.status(400).json({ error: customerError?.message || "Failed to create customer profile" });
+    }
+    customer = customerData;
+  }
+
   const token = signToken(user);
   return res.json({
     token,
@@ -899,6 +995,7 @@ app.post("/api/v1/auth/register", async (req, res) => {
       is_active: user.is_active,
       pin_enabled: !!user.pin_enabled,
     },
+    customer,
   });
 });
 
@@ -907,8 +1004,21 @@ app.post("/api/v1/auth/otp/send", async (req, res) => {
   if (!email) {
     return res.status(400).json({ error: "email is required" });
   }
+  const ip = getClientIp(req);
   const cleanEmail = String(email).trim().toLowerCase();
   const cleanPurpose = purpose ? String(purpose).trim().toLowerCase() : "login";
+
+  const rate = consumeAuthRateLimit({
+    key: `otp-send:${ip}:${cleanEmail}`,
+    limit: OTP_SEND_MAX_PER_WINDOW,
+    windowMs: AUTH_RATE_WINDOW_MS,
+  });
+  if (!rate.allowed) {
+    return res.status(429).json({
+      error: "Too many OTP requests. Try again later.",
+      retry_after_seconds: rate.retryAfterSeconds,
+    });
+  }
 
   const { data: user, error: userError } = await supabase
     .from("users")
@@ -920,52 +1030,89 @@ app.post("/api/v1/auth/otp/send", async (req, res) => {
     return res.status(404).json({ error: "User not found or inactive" });
   }
 
-  const otp = generateOtp4();
-  const otp_hash = await bcrypt.hash(otp, 10);
-  const expires_at = getOtpExpiryIso();
+  try {
+    const data = await createAndSendOtpForUser({ user, purpose: cleanPurpose });
+    return res.json({
+      data: {
+        otp_id: data.id,
+        email: data.email,
+        purpose: data.purpose,
+        expires_at: data.expires_at,
+      },
+      message: "OTP sent successfully",
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "Failed to send OTP" });
+  }
+});
 
-  await supabase
+app.post("/api/v1/auth/otp/resend", async (req, res) => {
+  const { email, purpose } = req.body || {};
+  if (!email) {
+    return res.status(400).json({ error: "email is required" });
+  }
+  const ip = getClientIp(req);
+  const cleanEmail = String(email).trim().toLowerCase();
+  const cleanPurpose = purpose ? String(purpose).trim().toLowerCase() : "login";
+
+  const rate = consumeAuthRateLimit({
+    key: `otp-send:${ip}:${cleanEmail}`,
+    limit: OTP_SEND_MAX_PER_WINDOW,
+    windowMs: AUTH_RATE_WINDOW_MS,
+  });
+  if (!rate.allowed) {
+    return res.status(429).json({
+      error: "Too many OTP requests. Try again later.",
+      retry_after_seconds: rate.retryAfterSeconds,
+    });
+  }
+
+  const { data: latestOtp, error: latestOtpError } = await supabase
     .from("otp_verify")
-    .update({ is_active: false })
+    .select("created_at, is_active")
     .eq("email", cleanEmail)
     .eq("purpose", cleanPurpose)
-    .eq("verified", false);
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latestOtpError) {
+    return res.status(400).json({ error: latestOtpError.message });
+  }
+  if (latestOtp?.created_at) {
+    const diffMs = Date.now() - new Date(latestOtp.created_at).getTime();
+    const cooldownMs = OTP_RESEND_COOLDOWN_SECONDS * 1000;
+    if (diffMs < cooldownMs) {
+      return res.status(429).json({
+        error: "Resend cooldown active. Please wait before requesting a new OTP.",
+        retry_after_seconds: Math.ceil((cooldownMs - diffMs) / 1000),
+      });
+    }
+  }
 
-  const { data, error } = await supabase
-    .from("otp_verify")
-    .insert({
-      user_id: user.id,
-      email: cleanEmail,
-      purpose: cleanPurpose,
-      otp_hash,
-      expires_at,
-      verified: false,
-      is_active: true,
-      attempts: 0,
-    })
-    .select("id, email, purpose, expires_at, created_at")
-    .single();
-
-  if (error || !data) {
-    return res.status(400).json({ error: error?.message || "Failed to create OTP" });
+  const { data: user, error: userError } = await supabase
+    .from("users")
+    .select("id, email, role, is_active")
+    .eq("email", cleanEmail)
+    .maybeSingle();
+  if (userError) return res.status(400).json({ error: userError.message });
+  if (!user || !user.is_active) {
+    return res.status(404).json({ error: "User not found or inactive" });
   }
 
   try {
-    await sendOtpEmail({ to: cleanEmail, otp });
-  } catch (mailError) {
-    await supabase.from("otp_verify").update({ is_active: false }).eq("id", data.id);
-    return res.status(400).json({ error: mailError.message || "Failed to send OTP email" });
+    const data = await createAndSendOtpForUser({ user, purpose: cleanPurpose });
+    return res.json({
+      data: {
+        otp_id: data.id,
+        email: data.email,
+        purpose: data.purpose,
+        expires_at: data.expires_at,
+      },
+      message: "OTP resent successfully",
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "Failed to resend OTP" });
   }
-
-  return res.json({
-    data: {
-      otp_id: data.id,
-      email: data.email,
-      purpose: data.purpose,
-      expires_at: data.expires_at,
-    },
-    message: "OTP sent successfully",
-  });
 });
 
 app.post("/api/v1/auth/otp/verify", async (req, res) => {
@@ -976,8 +1123,21 @@ app.post("/api/v1/auth/otp/verify", async (req, res) => {
   const cleanEmail = String(email).trim().toLowerCase();
   const cleanPurpose = purpose ? String(purpose).trim().toLowerCase() : "login";
   const cleanOtp = String(otp).trim();
+  const ip = getClientIp(req);
   if (!/^\d{4}$/.test(cleanOtp)) {
     return res.status(400).json({ error: "otp must be exactly 4 digits" });
+  }
+
+  const verifyRate = consumeAuthRateLimit({
+    key: `otp-verify:${ip}:${cleanEmail}`,
+    limit: OTP_VERIFY_MAX_PER_WINDOW,
+    windowMs: AUTH_RATE_WINDOW_MS,
+  });
+  if (!verifyRate.allowed) {
+    return res.status(429).json({
+      error: "Too many OTP verification attempts. Try again later.",
+      retry_after_seconds: verifyRate.retryAfterSeconds,
+    });
   }
 
   const { data: otpRow, error: otpError } = await supabase
@@ -1050,26 +1210,53 @@ app.post("/api/v1/auth/otp/verify", async (req, res) => {
 });
 
 app.post("/api/v1/auth/login", async (req, res) => {
-  const { email, password } = req.body || {};
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email and password are required" });
+  return res.status(410).json({
+    error: "Password login disabled. Use OTP login (/api/v1/auth/otp/send + /api/v1/auth/otp/verify) or PIN login (/api/v1/auth/login/pin).",
+  });
+});
+
+app.post("/api/v1/auth/login/pin", async (req, res) => {
+  const { email, pin } = req.body || {};
+  if (!email || !pin) {
+    return res.status(400).json({ error: "Email and PIN are required" });
   }
 
   const cleanEmail = String(email).trim().toLowerCase();
+  const pinString = String(pin).trim();
+  const ip = getClientIp(req);
+  if (!/^\d{4,6}$/.test(pinString)) {
+    return res.status(400).json({ error: "PIN must be 4 to 6 digits" });
+  }
+
+  const pinRate = consumeAuthRateLimit({
+    key: `pin-login:${ip}:${cleanEmail}`,
+    limit: PIN_LOGIN_MAX_PER_WINDOW,
+    windowMs: AUTH_RATE_WINDOW_MS,
+  });
+  if (!pinRate.allowed) {
+    return res.status(429).json({
+      error: "Too many PIN login attempts. Try again later.",
+      retry_after_seconds: pinRate.retryAfterSeconds,
+    });
+  }
+
   const { data: user, error } = await supabase
     .from("users")
     .select("*")
     .eq("email", cleanEmail)
     .eq("is_active", true)
-    .single();
+    .maybeSingle();
 
   if (error || !user) {
     return res.status(401).json({ error: "Invalid credentials" });
   }
+  if (!user.pin_enabled || !user.pin_hash) {
+    return res.status(400).json({ error: "PIN is not set. Login with OTP and set PIN first." });
+  }
 
-  const passwordOk = await bcrypt.compare(String(password), user.password_hash);
-  if (!passwordOk) {
-    return res.status(401).json({ error: "Invalid credentials" });
+  const pinOk = await bcrypt.compare(pinString, user.pin_hash);
+  if (!pinOk) {
+    return res.status(401).json({ error: "Invalid PIN" });
   }
 
   const token = signToken(user);

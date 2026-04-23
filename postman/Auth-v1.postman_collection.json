@@ -19,7 +19,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"email\": \"customer1@test.com\",\n  \"password\": \"Pass@123\",\n  \"role\": \"customer\"\n}"
+          "raw": "{\n  \"email\": \"customer1@test.com\",\n  \"role\": \"customer\",\n  \"name\": \"Test Customer\",\n  \"phone\": \"9876543210\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/auth/register",
@@ -33,7 +33,7 @@
             "register"
           ]
         },
-        "description": "Create a customer user and return JWT token."
+        "description": "Create user without password (OTP-first flow). Password optional."
       },
       "response": [],
       "event": [
@@ -56,7 +56,7 @@
       ]
     },
     {
-      "name": "2. Login",
+      "name": "2. Password Login (Disabled)",
       "request": {
         "method": "POST",
         "header": [
@@ -68,7 +68,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"email\": \"customer1@test.com\",\n  \"password\": \"Pass@123\"\n}"
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"Pass@123\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/auth/login",
@@ -82,7 +82,7 @@
             "login"
           ]
         },
-        "description": "Login and get a fresh JWT token."
+        "description": "Password login is disabled. Expected HTTP 410."
       },
       "response": [],
       "event": [
@@ -91,14 +91,9 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test(\"Status code is 200\", function () {",
-              "  pm.response.to.have.status(200);",
-              "});",
-              "",
-              "const json = pm.response.json();",
-              "if (json.token) {",
-              "  pm.collectionVariables.set(\"token\", json.token);",
-              "}"
+              "pm.test('Status code is 410', function () {",
+              "  pm.response.to.have.status(410);",
+              "});"
             ]
           }
         }
@@ -133,6 +128,38 @@
           ]
         },
         "description": "Send 4-digit OTP to email and save in otp_verify table."
+      },
+      "response": []
+    },
+    {
+      "name": "2A1. Resend OTP",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"purpose\": \"login\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/otp/resend",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "otp",
+            "resend"
+          ]
+        },
+        "description": "Resend OTP (cooldown applies)."
       },
       "response": []
     },
@@ -176,6 +203,50 @@
               "pm.test(\"Status code is 200\", function () {",
               "  pm.response.to.have.status(200);",
               "});",
+              "const json = pm.response.json();",
+              "if (json.token) { pm.collectionVariables.set('token', json.token); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2C. Login With PIN",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"pin\": \"1234\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login/pin",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "login",
+            "pin"
+          ]
+        },
+        "description": "Login using email + PIN after first OTP verification and PIN setup."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
               "const json = pm.response.json();",
               "if (json.token) { pm.collectionVariables.set('token', json.token); }"
             ]
