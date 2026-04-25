@@ -29,6 +29,8 @@ const OTP_SEND_MAX_PER_WINDOW = Math.max(Number(process.env.OTP_SEND_MAX_PER_WIN
 const OTP_VERIFY_MAX_PER_WINDOW = Math.max(Number(process.env.OTP_VERIFY_MAX_PER_WINDOW) || 10, 1);
 const PIN_LOGIN_MAX_PER_WINDOW = Math.max(Number(process.env.PIN_LOGIN_MAX_PER_WINDOW) || 10, 1);
 const AUTH_RATE_WINDOW_MS = Math.max(Number(process.env.AUTH_RATE_WINDOW_MS) || 15 * 60 * 1000, 60 * 1000);
+const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+const RESEND_API_BASE = process.env.RESEND_API_BASE || "https://api.resend.com";
 const SMTP_HOST = process.env.SMTP_HOST || "";
 const SMTP_PORT = Number(process.env.SMTP_PORT) || 587;
 const SMTP_USER = process.env.SMTP_USER || "";
@@ -303,20 +305,6 @@ function getOtpExpiryIso() {
 }
 
 async function sendOtpEmail({ to, otp }) {
-  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS || !SMTP_FROM) {
-    throw new Error("SMTP is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM");
-  }
-
-  const transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_PORT === 465,
-    auth: {
-      user: SMTP_USER,
-      pass: SMTP_PASS,
-    },
-  });
-
   const subject = "Your Swampurna OTP Code";
   const text = `Your OTP is ${otp}. It expires in ${OTP_TTL_MINUTES} minutes. If you did not request this code, please ignore this email.`;
   const html = `
@@ -373,14 +361,44 @@ async function sendOtpEmail({ to, otp }) {
       </body>
     </html>
   `;
+  if (RESEND_API_KEY) {
+    const response = await fetch(`${RESEND_API_BASE.replace(/\/+$/, "")}/emails`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: SMTP_FROM,
+        to: [to],
+        subject,
+        text,
+        html,
+      }),
+    });
 
-  await transporter.sendMail({
-    from: SMTP_FROM,
-    to,
-    subject,
-    text,
-    html,
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload?.message || payload?.error || `Resend send failed (${response.status})`);
+    }
+    return;
+  }
+
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS || !SMTP_FROM) {
+    throw new Error("Email provider is not configured. Set RESEND_API_KEY (recommended) or SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS/SMTP_FROM.");
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_PORT === 465,
+    auth: {
+      user: SMTP_USER,
+      pass: SMTP_PASS,
+    },
   });
+
+  await transporter.sendMail({ from: SMTP_FROM, to, subject, text, html });
 }
 
 async function createAndSendOtpForUser({ user, purpose = "login" }) {
@@ -425,6 +443,130 @@ async function createAndSendOtpForUser({ user, purpose = "login" }) {
   }
 
   return data;
+}
+
+async function verifyOtpAndIssueSession({ email, otp, purpose, ip }) {
+  const cleanEmail = String(email).trim().toLowerCase();
+  const cleanPurpose = purpose ? String(purpose).trim().toLowerCase() : "login";
+  const cleanOtp = String(otp).trim();
+  if (!/^\d{4}$/.test(cleanOtp)) {
+    const err = new Error("otp must be exactly 4 digits");
+    err.status = 400;
+    throw err;
+  }
+
+  const verifyRate = consumeAuthRateLimit({
+    key: `otp-verify:${ip}:${cleanEmail}`,
+    limit: OTP_VERIFY_MAX_PER_WINDOW,
+    windowMs: AUTH_RATE_WINDOW_MS,
+  });
+  if (!verifyRate.allowed) {
+    const err = new Error("Too many OTP verification attempts. Try again later.");
+    err.status = 429;
+    err.retry_after_seconds = verifyRate.retryAfterSeconds;
+    throw err;
+  }
+
+  const { data: otpRow, error: otpError } = await supabase
+    .from("otp_verify")
+    .select("*")
+    .eq("email", cleanEmail)
+    .eq("purpose", cleanPurpose)
+    .eq("verified", false)
+    .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (otpError) {
+    const err = new Error(otpError.message);
+    err.status = 400;
+    throw err;
+  }
+  if (!otpRow) {
+    const err = new Error("OTP not found. Request a new OTP.");
+    err.status = 400;
+    throw err;
+  }
+  if (new Date(otpRow.expires_at).getTime() < Date.now()) {
+    await supabase.from("otp_verify").update({ is_active: false }).eq("id", otpRow.id);
+    const err = new Error("OTP expired. Request a new OTP.");
+    err.status = 400;
+    throw err;
+  }
+  if ((otpRow.attempts || 0) >= 5) {
+    await supabase.from("otp_verify").update({ is_active: false }).eq("id", otpRow.id);
+    const err = new Error("OTP blocked after too many attempts. Request a new OTP.");
+    err.status = 400;
+    throw err;
+  }
+
+  const matched = await bcrypt.compare(cleanOtp, otpRow.otp_hash);
+  if (!matched) {
+    await supabase
+      .from("otp_verify")
+      .update({ attempts: (otpRow.attempts || 0) + 1 })
+      .eq("id", otpRow.id);
+    const err = new Error("Invalid OTP");
+    err.status = 401;
+    throw err;
+  }
+
+  const { data: user, error: userError } = await supabase
+    .from("users")
+    .select("*")
+    .eq("email", cleanEmail)
+    .maybeSingle();
+  if (userError || !user) {
+    const err = new Error("User not found");
+    err.status = 404;
+    throw err;
+  }
+
+  let finalUser = user;
+  if (cleanPurpose === "register") {
+    if (!user.is_active) {
+      const { data: activatedUser, error: activateError } = await supabase
+        .from("users")
+        .update({ is_active: true })
+        .eq("id", user.id)
+        .select("*")
+        .single();
+      if (activateError || !activatedUser) {
+        const err = new Error(activateError?.message || "Failed to activate account");
+        err.status = 400;
+        throw err;
+      }
+      finalUser = activatedUser;
+    }
+  } else if (!user.is_active) {
+    const err = new Error("Account not verified. Complete register OTP verification first.");
+    err.status = 403;
+    throw err;
+  }
+
+  await supabase
+    .from("otp_verify")
+    .update({
+      verified: true,
+      verified_at: new Date().toISOString(),
+      is_active: false,
+      attempts: (otpRow.attempts || 0) + 1,
+    })
+    .eq("id", otpRow.id);
+
+  const token = signToken(finalUser);
+  return {
+    verified: true,
+    token,
+    user: {
+      id: finalUser.id,
+      email: finalUser.email,
+      role: finalUser.role,
+      is_active: finalUser.is_active,
+      pin_enabled: !!finalUser.pin_enabled,
+    },
+    purpose: cleanPurpose,
+  };
 }
 
 function isValidReminderType(value) {
@@ -933,15 +1075,33 @@ app.post("/api/v1/auth/register", async (req, res) => {
 
   const { data: existingUser, error: existingUserError } = await supabase
     .from("users")
-    .select("id")
+    .select("id, email, role, is_active, pin_enabled")
     .eq("email", cleanEmail)
-    .single();
+    .maybeSingle();
 
   if (existingUserError && existingUserError.code !== "PGRST116") {
     return res.status(400).json({ error: existingUserError.message });
   }
   if (existingUser) {
-    return res.status(400).json({ error: "Email already registered" });
+    if (existingUser.is_active) {
+      return res.status(400).json({ error: "Email already registered" });
+    }
+    try {
+      const otpData = await createAndSendOtpForUser({ user: existingUser, purpose: "register" });
+      return res.json({
+        requires_verification: true,
+        message: "Account exists but is not verified. OTP sent for verification.",
+        data: {
+          otp_id: otpData.id,
+          email: otpData.email,
+          purpose: otpData.purpose,
+          expires_at: otpData.expires_at,
+          user_id: existingUser.id,
+        },
+      });
+    } catch (err) {
+      return res.status(400).json({ error: err.message || "Failed to send verification OTP" });
+    }
   }
 
   const finalPasswordValue = password ? String(password) : `otp-only-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -955,7 +1115,7 @@ app.post("/api/v1/auth/register", async (req, res) => {
       email: cleanEmail,
       password_hash,
       role: cleanRole,
-      is_active: true,
+      is_active: false,
     })
     .select("*")
     .single();
@@ -985,18 +1145,100 @@ app.post("/api/v1/auth/register", async (req, res) => {
     customer = customerData;
   }
 
-  const token = signToken(user);
-  return res.json({
-    token,
-    user: {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      is_active: user.is_active,
-      pin_enabled: !!user.pin_enabled,
-    },
-    customer,
+  try {
+    const otpData = await createAndSendOtpForUser({ user, purpose: "register" });
+    return res.json({
+      requires_verification: true,
+      message: "Registration successful. Verify your account with OTP sent to email.",
+      data: {
+        otp_id: otpData.id,
+        email: otpData.email,
+        purpose: otpData.purpose,
+        expires_at: otpData.expires_at,
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          is_active: user.is_active,
+          pin_enabled: !!user.pin_enabled,
+        },
+        customer,
+      },
+    });
+  } catch (otpError) {
+    // rollback so unverified orphan records are not left behind on failed initial OTP send
+    if (customer?.id) {
+      await supabase.from("customers").delete().eq("id", customer.id);
+    }
+    await supabase.from("users").delete().eq("id", user.id);
+    return res.status(400).json({ error: otpError.message || "Failed to send verification OTP" });
+  }
+});
+
+app.post("/api/v1/auth/register/otp/resend", async (req, res) => {
+  const { email } = req.body || {};
+  if (!email) {
+    return res.status(400).json({ error: "email is required" });
+  }
+  const cleanEmail = String(email).trim().toLowerCase();
+  const ip = getClientIp(req);
+
+  const rate = consumeAuthRateLimit({
+    key: `otp-send:${ip}:${cleanEmail}`,
+    limit: OTP_SEND_MAX_PER_WINDOW,
+    windowMs: AUTH_RATE_WINDOW_MS,
   });
+  if (!rate.allowed) {
+    return res.status(429).json({
+      error: "Too many OTP requests. Try again later.",
+      retry_after_seconds: rate.retryAfterSeconds,
+    });
+  }
+
+  const { data: user, error: userError } = await supabase
+    .from("users")
+    .select("id, email, role, is_active")
+    .eq("email", cleanEmail)
+    .maybeSingle();
+  if (userError) return res.status(400).json({ error: userError.message });
+  if (!user) return res.status(404).json({ error: "User not found" });
+  if (user.is_active) return res.status(400).json({ error: "Account already verified" });
+
+  try {
+    const otpData = await createAndSendOtpForUser({ user, purpose: "register" });
+    return res.json({
+      message: "Verification OTP resent successfully",
+      data: {
+        otp_id: otpData.id,
+        email: otpData.email,
+        purpose: otpData.purpose,
+        expires_at: otpData.expires_at,
+      },
+    });
+  } catch (err) {
+    return res.status(400).json({ error: err.message || "Failed to resend verification OTP" });
+  }
+});
+
+app.post("/api/v1/auth/register/otp/verify", async (req, res) => {
+  const { email, otp } = req.body || {};
+  if (!email || !otp) {
+    return res.status(400).json({ error: "email and otp are required" });
+  }
+  try {
+    const payload = await verifyOtpAndIssueSession({
+      email,
+      otp,
+      purpose: "register",
+      ip: getClientIp(req),
+    });
+    return res.json(payload);
+  } catch (err) {
+    return res.status(err.status || 400).json({
+      error: err.message || "OTP verification failed",
+      ...(err.retry_after_seconds ? { retry_after_seconds: err.retry_after_seconds } : {}),
+    });
+  }
 });
 
 app.post("/api/v1/auth/otp/send", async (req, res) => {
@@ -1026,8 +1268,14 @@ app.post("/api/v1/auth/otp/send", async (req, res) => {
     .eq("email", cleanEmail)
     .maybeSingle();
   if (userError) return res.status(400).json({ error: userError.message });
-  if (!user || !user.is_active) {
-    return res.status(404).json({ error: "User not found or inactive" });
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+  if (cleanPurpose === "register" && user.is_active) {
+    return res.status(400).json({ error: "Account already verified" });
+  }
+  if (cleanPurpose !== "register" && !user.is_active) {
+    return res.status(403).json({ error: "Account not verified. Complete register OTP verification first." });
   }
 
   try {
@@ -1095,8 +1343,14 @@ app.post("/api/v1/auth/otp/resend", async (req, res) => {
     .eq("email", cleanEmail)
     .maybeSingle();
   if (userError) return res.status(400).json({ error: userError.message });
-  if (!user || !user.is_active) {
-    return res.status(404).json({ error: "User not found or inactive" });
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+  if (cleanPurpose === "register" && user.is_active) {
+    return res.status(400).json({ error: "Account already verified" });
+  }
+  if (cleanPurpose !== "register" && !user.is_active) {
+    return res.status(403).json({ error: "Account not verified. Complete register OTP verification first." });
   }
 
   try {
@@ -1120,93 +1374,20 @@ app.post("/api/v1/auth/otp/verify", async (req, res) => {
   if (!email || !otp) {
     return res.status(400).json({ error: "email and otp are required" });
   }
-  const cleanEmail = String(email).trim().toLowerCase();
-  const cleanPurpose = purpose ? String(purpose).trim().toLowerCase() : "login";
-  const cleanOtp = String(otp).trim();
-  const ip = getClientIp(req);
-  if (!/^\d{4}$/.test(cleanOtp)) {
-    return res.status(400).json({ error: "otp must be exactly 4 digits" });
-  }
-
-  const verifyRate = consumeAuthRateLimit({
-    key: `otp-verify:${ip}:${cleanEmail}`,
-    limit: OTP_VERIFY_MAX_PER_WINDOW,
-    windowMs: AUTH_RATE_WINDOW_MS,
-  });
-  if (!verifyRate.allowed) {
-    return res.status(429).json({
-      error: "Too many OTP verification attempts. Try again later.",
-      retry_after_seconds: verifyRate.retryAfterSeconds,
+  try {
+    const payload = await verifyOtpAndIssueSession({
+      email,
+      otp,
+      purpose,
+      ip: getClientIp(req),
+    });
+    return res.json(payload);
+  } catch (err) {
+    return res.status(err.status || 400).json({
+      error: err.message || "OTP verification failed",
+      ...(err.retry_after_seconds ? { retry_after_seconds: err.retry_after_seconds } : {}),
     });
   }
-
-  const { data: otpRow, error: otpError } = await supabase
-    .from("otp_verify")
-    .select("*")
-    .eq("email", cleanEmail)
-    .eq("purpose", cleanPurpose)
-    .eq("verified", false)
-    .eq("is_active", true)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (otpError) {
-    return res.status(400).json({ error: otpError.message });
-  }
-  if (!otpRow) {
-    return res.status(400).json({ error: "OTP not found. Request a new OTP." });
-  }
-  if (new Date(otpRow.expires_at).getTime() < Date.now()) {
-    await supabase.from("otp_verify").update({ is_active: false }).eq("id", otpRow.id);
-    return res.status(400).json({ error: "OTP expired. Request a new OTP." });
-  }
-  if ((otpRow.attempts || 0) >= 5) {
-    await supabase.from("otp_verify").update({ is_active: false }).eq("id", otpRow.id);
-    return res.status(400).json({ error: "OTP blocked after too many attempts. Request a new OTP." });
-  }
-
-  const matched = await bcrypt.compare(cleanOtp, otpRow.otp_hash);
-  if (!matched) {
-    await supabase
-      .from("otp_verify")
-      .update({ attempts: (otpRow.attempts || 0) + 1 })
-      .eq("id", otpRow.id);
-    return res.status(401).json({ error: "Invalid OTP" });
-  }
-
-  const { data: user, error: userError } = await supabase
-    .from("users")
-    .select("*")
-    .eq("email", cleanEmail)
-    .eq("is_active", true)
-    .maybeSingle();
-  if (userError || !user) {
-    return res.status(404).json({ error: "User not found" });
-  }
-
-  await supabase
-    .from("otp_verify")
-    .update({
-      verified: true,
-      verified_at: new Date().toISOString(),
-      is_active: false,
-      attempts: (otpRow.attempts || 0) + 1,
-    })
-    .eq("id", otpRow.id);
-
-  const token = signToken(user);
-  return res.json({
-    verified: true,
-    token,
-    user: {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      is_active: user.is_active,
-      pin_enabled: !!user.pin_enabled,
-    },
-  });
 });
 
 app.post("/api/v1/auth/login", async (req, res) => {
