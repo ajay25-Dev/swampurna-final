@@ -1601,6 +1601,194 @@ app.get("/api/v1/auth/me", apiAuthRequired, async (req, res) => {
   return res.json({ user });
 });
 
+const ONBOARDING_SOURCE_VALUES = [
+  "google_play_or_google_search",
+  "friends_or_family",
+  "instagram_or_facebook",
+  "tiktok",
+  "youtube_or_tv",
+  "influencer_or_celebrity",
+  "medical_or_professional",
+  "other",
+];
+
+const ONBOARDING_SOURCE_LABEL_MAP = {
+  "google play or google search": "google_play_or_google_search",
+  "friends or family": "friends_or_family",
+  "instagram or facebook": "instagram_or_facebook",
+  tiktok: "tiktok",
+  "youtube or tv": "youtube_or_tv",
+  "influencer or celebrity": "influencer_or_celebrity",
+  "medical or professional": "medical_or_professional",
+  other: "other",
+};
+
+const PREGNANCY_STATUS_VALUES = [
+  "no_but_i_want_to_be",
+  "no_i_am_here_to_understand_my_body",
+  "yes_i_am",
+];
+
+const PREGNANCY_STATUS_LABEL_MAP = {
+  "no, but i want to be": "no_but_i_want_to_be",
+  "no, i am here to understand my body": "no_i_am_here_to_understand_my_body",
+  "yes, i am": "yes_i_am",
+};
+
+function normalizeOnboardingSource(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const raw = String(value).trim().toLowerCase();
+  const mapped = ONBOARDING_SOURCE_LABEL_MAP[raw] || raw.replace(/[\s-]+/g, "_");
+  if (!ONBOARDING_SOURCE_VALUES.includes(mapped)) return undefined;
+  return mapped;
+}
+
+function normalizePregnancyStatus(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const raw = String(value).trim().toLowerCase();
+  const mapped = PREGNANCY_STATUS_LABEL_MAP[raw] || raw.replace(/[\s-]+/g, "_");
+  if (!PREGNANCY_STATUS_VALUES.includes(mapped)) return undefined;
+  return mapped;
+}
+
+function normalizeBirthYear(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const year = Number(value);
+  const currentYear = new Date().getUTCFullYear();
+  if (!Number.isInteger(year) || year < 1940 || year > currentYear) {
+    return undefined;
+  }
+  return year;
+}
+
+app.get("/api/v1/customers/profile", apiAuthRequired, async (req, res) => {
+  const { data, error } = await supabase
+    .from("customers")
+    .select("*")
+    .eq("user_id", req.user.id)
+    .maybeSingle();
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  return res.json({ data: data || null });
+});
+
+app.put("/api/v1/customers/profile", apiAuthRequired, async (req, res) => {
+  const {
+    name,
+    phone,
+    onboarding_source,
+    birth_year,
+    pregnancy_status,
+  } = req.body || {};
+
+  const updates = { user_id: req.user.id };
+  if (name !== undefined) updates.name = name ? String(name).trim() : "Customer";
+  if (phone !== undefined) updates.phone = phone ? String(phone).trim() : null;
+  if (onboarding_source !== undefined) {
+    const val = normalizeOnboardingSource(onboarding_source);
+    if (val === undefined) {
+      return res.status(400).json({ error: "Invalid onboarding_source value" });
+    }
+    updates.onboarding_source = val;
+  }
+  if (birth_year !== undefined) {
+    const val = normalizeBirthYear(birth_year);
+    if (val === undefined) {
+      const currentYear = new Date().getUTCFullYear();
+      return res.status(400).json({ error: `birth_year must be between 1940 and ${currentYear}` });
+    }
+    updates.birth_year = val;
+  }
+  if (pregnancy_status !== undefined) {
+    const val = normalizePregnancyStatus(pregnancy_status);
+    if (val === undefined) {
+      return res.status(400).json({ error: "Invalid pregnancy_status value" });
+    }
+    updates.pregnancy_status = val;
+  }
+
+  const { data, error } = await supabase
+    .from("customers")
+    .upsert(updates, { onConflict: "user_id" })
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to save customer profile" });
+  }
+
+  return res.json({ data });
+});
+
+app.post("/api/v1/customers/onboarding", apiAuthRequired, async (req, res) => {
+  if (req.user.role !== "customer") {
+    return res.status(403).json({ error: "Only customer accounts can update onboarding details" });
+  }
+
+  const {
+    step,
+    onboarding_source,
+    birth_year,
+    pregnancy_status,
+  } = req.body || {};
+
+  const updates = { user_id: req.user.id };
+  const normalizedStep = step ? String(step).trim().toLowerCase() : null;
+
+  const isSourceStep = ["source", "onboarding_source", "how_found_us"].includes(normalizedStep);
+  const isBirthStep = ["birth", "birth_year", "year_of_birth"].includes(normalizedStep);
+  const isPregnancyStep = ["pregnancy", "pregnancy_status", "pregnant"].includes(normalizedStep);
+
+  if (isSourceStep || onboarding_source !== undefined) {
+    const val = normalizeOnboardingSource(onboarding_source);
+    if (val === undefined) {
+      return res.status(400).json({ error: "Invalid onboarding_source value" });
+    }
+    updates.onboarding_source = val;
+  }
+
+  if (isBirthStep || birth_year !== undefined) {
+    const val = normalizeBirthYear(birth_year);
+    if (val === undefined) {
+      const currentYear = new Date().getUTCFullYear();
+      return res.status(400).json({ error: `birth_year must be between 1940 and ${currentYear}` });
+    }
+    updates.birth_year = val;
+  }
+
+  if (isPregnancyStep || pregnancy_status !== undefined) {
+    const val = normalizePregnancyStatus(pregnancy_status);
+    if (val === undefined) {
+      return res.status(400).json({ error: "Invalid pregnancy_status value" });
+    }
+    updates.pregnancy_status = val;
+  }
+
+  const changedKeys = Object.keys(updates).filter((key) => key !== "user_id");
+  if (changedKeys.length === 0) {
+    return res.status(400).json({
+      error: "No onboarding fields provided. Send onboarding_source, birth_year, or pregnancy_status.",
+    });
+  }
+
+  const { data, error } = await supabase
+    .from("customers")
+    .upsert(updates, { onConflict: "user_id" })
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to save onboarding details" });
+  }
+
+  return res.json({
+    message: "Onboarding details saved",
+    data,
+  });
+});
+
 app.post("/api/v1/auth/pin/set", apiAuthRequired, async (req, res) => {
   const { pin } = req.body || {};
   if (!pin) {

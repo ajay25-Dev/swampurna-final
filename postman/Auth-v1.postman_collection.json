@@ -476,6 +476,97 @@
           }
         }
       ]
+    },
+    {
+      "name": "6. Get Customer Profile",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/customers/profile",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "customers",
+            "profile"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "7. Upsert Customer Profile",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Aditi Sharma\",\n  \"phone\": \"+919999999999\",\n  \"onboarding_source\": \"instagram_or_facebook\",\n  \"birth_year\": 2000,\n  \"pregnancy_status\": \"no_i_am_here_to_understand_my_body\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/customers/profile",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "customers",
+            "profile"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "8. Save Onboarding Step",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"step\": \"source\",\n  \"onboarding_source\": \"Instagram or Facebook\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/customers/onboarding",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "customers",
+            "onboarding"
+          ]
+        }
+      },
+      "response": []
     }
   ],
   "variable": [
