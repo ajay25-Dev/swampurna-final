@@ -5,6 +5,7 @@ export const ROUTES = [
     { path: '/admin/customers', loader: () => import('../pages/admin/Customers') },
     { path: '/admin/support-reports', loader: () => import('../pages/admin/SupportReports') },
     { path: '/admin/cycle-snaps', loader: () => import('../pages/admin/CycleSnaps') },
+    { path: '/admin/testimonials', loader: () => import('../pages/admin/TestimonialsModeration') },
     { path: '/admin/tracker-details', loader: () => import('../pages/admin/TrackerDetails') },
     { path: '/admin/pages/:slug', loader: () => import('../pages/admin/PageEditor') },
     { path: '/Whoweare', loader: () => import('../pages/Whoweare') },

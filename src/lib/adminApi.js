@@ -89,6 +89,15 @@ export const adminApi = {
       method: "PUT",
       body: JSON.stringify({ status }),
     }),
+  getTestimonialsModeration: ({ status = "", limit = 50, offset = 0 } = {}) =>
+    request(
+      `/api/admin/testimonials?status=${encodeURIComponent(status)}&limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`
+    ),
+  moderateTestimonial: (id, action) =>
+    request(`/api/admin/testimonials/${id}/moderate`, {
+      method: "PUT",
+      body: JSON.stringify({ action }),
+    }),
   getTrackerUsers: () => request("/api/admin/period-tracker/users"),
   getTrackerUserDetails: (userId, month = "") =>
     request(`/api/admin/period-tracker/user/${encodeURIComponent(userId)}/details?month=${encodeURIComponent(month)}`),

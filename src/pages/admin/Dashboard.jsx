@@ -5,7 +5,7 @@ import AdminLayout from "./AdminLayout";
 
 const sections = [
   { label: "CRM", items: ["customers"] },
-  { label: "App Ops", items: ["support-reports", "cycle-snaps", "tracker-details"] },
+  { label: "App Ops", items: ["support-reports", "cycle-snaps", "testimonials", "tracker-details"] },
   { label: "Home", items: ["Home"] },
   { label: "About Us", items: ["Whoweare", "Missionvision", "Ourteam", "Ourpartner", "Projecthistory"] },
   { label: "Our Work", items: ["Programinitiative", "Ourapproach", "Impactstories"] },
@@ -34,6 +34,8 @@ const Dashboard = () => {
                           ? "/admin/support-reports"
                           : item === "cycle-snaps"
                             ? "/admin/cycle-snaps"
+                            : item === "testimonials"
+                              ? "/admin/testimonials"
                             : item === "tracker-details"
                               ? "/admin/tracker-details"
                             : `/admin/pages/${item}`

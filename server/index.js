@@ -1064,6 +1064,140 @@ app.get("/api/public/videogallery", async (req, res) => {
   return res.json({ data: data || [] });
 });
 
+app.get("/api/v1/testimonials", async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+
+  const { data, error } = await supabase
+    .from("customer_testimonials")
+    .select("id, name, quote, rating, created_at")
+    .eq("is_active", true)
+    .eq("is_approved", true)
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  return res.json({ data: data || [], meta: { limit, offset } });
+});
+
+app.post("/api/v1/testimonials", apiAuthRequired, async (req, res) => {
+  const { name, quote, rating } = req.body || {};
+  const cleanQuote = String(quote || "").trim();
+  const cleanName = String(name || "").trim();
+
+  if (!cleanName) {
+    return res.status(400).json({ error: "name is required" });
+  }
+  if (!cleanQuote) {
+    return res.status(400).json({ error: "quote is required" });
+  }
+
+  const parsedRating = rating === undefined || rating === null ? null : Number(rating);
+  if (parsedRating !== null && (!Number.isFinite(parsedRating) || parsedRating < 1 || parsedRating > 5)) {
+    return res.status(400).json({ error: "rating must be between 1 and 5" });
+  }
+
+  const isAdmin = req.user.role === "admin";
+  const { data, error } = await supabase
+    .from("customer_testimonials")
+    .insert({
+      user_id: req.user.id,
+      name: cleanName,
+      quote: cleanQuote,
+      rating: parsedRating,
+      is_active: true,
+      is_approved: isAdmin,
+    })
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to create testimonial" });
+  }
+
+  return res.json({
+    data,
+    message: isAdmin
+      ? "Testimonial published."
+      : "Testimonial submitted for approval.",
+  });
+});
+
+app.get("/api/admin/testimonials", authRequired, async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+  const status = String(req.query.status || "").trim().toLowerCase();
+
+  let query = supabase
+    .from("customer_testimonials")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (status === "approved") {
+    query = query.eq("is_approved", true).eq("is_active", true);
+  } else if (status === "pending") {
+    query = query.eq("is_approved", false).eq("is_active", true);
+  } else if (status === "rejected") {
+    query = query.eq("is_active", false);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const userIds = Array.from(new Set((data || []).map((row) => row.user_id).filter(Boolean)));
+  let usersMap = {};
+  if (userIds.length) {
+    const { data: usersData } = await supabase.from("users").select("id, email, role").in("id", userIds);
+    usersMap = Object.fromEntries((usersData || []).map((u) => [u.id, u]));
+  }
+
+  const rows = (data || []).map((row) => ({
+    ...row,
+    user: row.user_id ? usersMap[row.user_id] || null : null,
+    moderation_status: row.is_active ? (row.is_approved ? "approved" : "pending") : "rejected",
+  }));
+
+  return res.json({ data: rows, meta: { limit, offset, status: status || null } });
+});
+
+app.put("/api/admin/testimonials/:id/moderate", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const action = String(req.body?.action || "").trim().toLowerCase();
+
+  const payloadByAction = {
+    approve: { is_approved: true, is_active: true },
+    reject: { is_approved: false, is_active: false },
+    pending: { is_approved: false, is_active: true },
+  };
+  const payload = payloadByAction[action];
+  if (!payload) {
+    return res.status(400).json({ error: "action must be one of: approve, reject, pending" });
+  }
+
+  const { data, error } = await supabase
+    .from("customer_testimonials")
+    .update(payload)
+    .eq("id", id)
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to moderate testimonial" });
+  }
+
+  return res.json({
+    data: {
+      ...data,
+      moderation_status: data.is_active ? (data.is_approved ? "approved" : "pending") : "rejected",
+    },
+  });
+});
+
 app.post("/api/v1/auth/register", async (req, res) => {
   const { email, password, role, name, phone } = req.body || {};
   if (!email) {

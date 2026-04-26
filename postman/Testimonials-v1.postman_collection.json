@@ -1,0 +1,135 @@
+{
+  "info": {
+    "_postman_id": "6f4d7ea0-9f99-4dce-9342-9a1910eb625f",
+    "name": "Swampurna Testimonials v1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Add and fetch customer testimonials."
+  },
+  "item": [
+    {
+      "name": "1. Login (Get Token)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"otp\": \"{{otp}}\",\n  \"purpose\": \"login\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/otp/verify",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "otp",
+            "verify"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "if (json.token) { pm.collectionVariables.set('token', json.token); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Add Testimonial",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Annie\",\n  \"quote\": \"Best period tracker ever, this helped me a lot.\",\n  \"rating\": 5\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/testimonials",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "testimonials"
+          ]
+        }
+      }
+    },
+    {
+      "name": "3. Fetch Testimonials",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/testimonials?limit={{limit}}&offset={{offset}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "testimonials"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "{{limit}}"
+            },
+            {
+              "key": "offset",
+              "value": "{{offset}}"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000"
+    },
+    {
+      "key": "email",
+      "value": "customer1@test.com"
+    },
+    {
+      "key": "otp",
+      "value": ""
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "limit",
+      "value": "20"
+    },
+    {
+      "key": "offset",
+      "value": "0"
+    }
+  ]
+}

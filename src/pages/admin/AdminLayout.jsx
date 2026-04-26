@@ -94,6 +94,9 @@ const AdminLayout = ({ children }) => {
             <NavLink to="/admin/cycle-snaps" className="nav-link" onClick={() => setSidebarOpen(false)}>
               Cycle Snaps
             </NavLink>
+            <NavLink to="/admin/testimonials" className="nav-link" onClick={() => setSidebarOpen(false)}>
+              Testimonials
+            </NavLink>
             <NavLink to="/admin/tracker-details" className="nav-link" onClick={() => setSidebarOpen(false)}>
               Tracker Details
             </NavLink>
