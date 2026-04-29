@@ -1773,6 +1773,20 @@ app.post("/api/v1/customers/onboarding", apiAuthRequired, async (req, res) => {
     });
   }
 
+  // customers.name is NOT NULL in DB. If profile row doesn't exist yet,
+  // upsert needs a fallback name to satisfy insert constraints.
+  const { data: existingCustomer, error: existingCustomerError } = await supabase
+    .from("customers")
+    .select("id, name")
+    .eq("user_id", req.user.id)
+    .maybeSingle();
+  if (existingCustomerError) {
+    return res.status(400).json({ error: existingCustomerError.message });
+  }
+  if (!existingCustomer) {
+    updates.name = (req.user.email ? String(req.user.email).split("@")[0] : "") || "Customer";
+  }
+
   const { data, error } = await supabase
     .from("customers")
     .upsert(updates, { onConflict: "user_id" })
