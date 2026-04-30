@@ -518,7 +518,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"name\": \"Aditi Sharma\",\n  \"phone\": \"+919999999999\",\n  \"onboarding_source\": \"instagram_or_facebook\",\n  \"birth_year\": 2000,\n  \"pregnancy_status\": \"no_i_am_here_to_understand_my_body\"\n}"
+          "raw": "{\n  \"name\": \"Aditi Sharma\",\n  \"phone\": \"+919999999999\",\n  \"onboarding_source\": \"instagram_or_facebook\",\n  \"birth_year\": 2000,\n  \"pregnancy_status\": \"no_i_am_here_to_understand_my_body\",\n  \"using_for\": \"self\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/customers/profile",
@@ -551,7 +551,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"step\": \"source\",\n  \"onboarding_source\": \"Instagram or Facebook\"\n}"
+          "raw": "{\n  \"step\": \"using_for\",\n  \"using_for\": \"Yes\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/customers/onboarding",

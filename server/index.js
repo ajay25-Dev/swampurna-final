@@ -1635,6 +1635,21 @@ const PREGNANCY_STATUS_LABEL_MAP = {
   "yes, i am": "yes_i_am",
 };
 
+const USING_FOR_VALUES = [
+  "self",
+  "partner",
+];
+
+const USING_FOR_LABEL_MAP = {
+  yes: "self",
+  self: "self",
+  "for myself": "self",
+  "no, it's for my partner.": "partner",
+  "no, its for my partner.": "partner",
+  "for my partner": "partner",
+  partner: "partner",
+};
+
 function normalizeOnboardingSource(value) {
   if (value === null || value === undefined || value === "") return null;
   const raw = String(value).trim().toLowerCase();
@@ -1648,6 +1663,14 @@ function normalizePregnancyStatus(value) {
   const raw = String(value).trim().toLowerCase();
   const mapped = PREGNANCY_STATUS_LABEL_MAP[raw] || raw.replace(/[\s-]+/g, "_");
   if (!PREGNANCY_STATUS_VALUES.includes(mapped)) return undefined;
+  return mapped;
+}
+
+function normalizeUsingFor(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const raw = String(value).trim().toLowerCase();
+  const mapped = USING_FOR_LABEL_MAP[raw] || raw.replace(/[\s-]+/g, "_");
+  if (!USING_FOR_VALUES.includes(mapped)) return undefined;
   return mapped;
 }
 
@@ -1681,6 +1704,7 @@ app.put("/api/v1/customers/profile", apiAuthRequired, async (req, res) => {
     onboarding_source,
     birth_year,
     pregnancy_status,
+    using_for,
   } = req.body || {};
 
   const updates = { user_id: req.user.id };
@@ -1708,6 +1732,13 @@ app.put("/api/v1/customers/profile", apiAuthRequired, async (req, res) => {
     }
     updates.pregnancy_status = val;
   }
+  if (using_for !== undefined) {
+    const val = normalizeUsingFor(using_for);
+    if (val === undefined) {
+      return res.status(400).json({ error: "Invalid using_for value. Allowed: self, partner" });
+    }
+    updates.using_for = val;
+  }
 
   const { data, error } = await supabase
     .from("customers")
@@ -1732,6 +1763,7 @@ app.post("/api/v1/customers/onboarding", apiAuthRequired, async (req, res) => {
     onboarding_source,
     birth_year,
     pregnancy_status,
+    using_for,
   } = req.body || {};
 
   const updates = { user_id: req.user.id };
@@ -1740,6 +1772,7 @@ app.post("/api/v1/customers/onboarding", apiAuthRequired, async (req, res) => {
   const isSourceStep = ["source", "onboarding_source", "how_found_us"].includes(normalizedStep);
   const isBirthStep = ["birth", "birth_year", "year_of_birth"].includes(normalizedStep);
   const isPregnancyStep = ["pregnancy", "pregnancy_status", "pregnant"].includes(normalizedStep);
+  const isUsingForStep = ["using_for", "usage", "self_or_partner"].includes(normalizedStep);
 
   if (isSourceStep || onboarding_source !== undefined) {
     const val = normalizeOnboardingSource(onboarding_source);
@@ -1765,11 +1798,18 @@ app.post("/api/v1/customers/onboarding", apiAuthRequired, async (req, res) => {
     }
     updates.pregnancy_status = val;
   }
+  if (isUsingForStep || using_for !== undefined) {
+    const val = normalizeUsingFor(using_for);
+    if (val === undefined) {
+      return res.status(400).json({ error: "Invalid using_for value. Allowed: self, partner" });
+    }
+    updates.using_for = val;
+  }
 
   const changedKeys = Object.keys(updates).filter((key) => key !== "user_id");
   if (changedKeys.length === 0) {
     return res.status(400).json({
-      error: "No onboarding fields provided. Send onboarding_source, birth_year, or pregnancy_status.",
+      error: "No onboarding fields provided. Send onboarding_source, birth_year, pregnancy_status, or using_for.",
     });
   }
 
