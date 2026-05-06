@@ -84,6 +84,8 @@ const PageEditor = () => {
   const [newVideoUrl, setNewVideoUrl] = useState("");
   const [newVideoTitle, setNewVideoTitle] = useState("");
   const [itemUploadingId, setItemUploadingId] = useState("");
+  const [newsCategories, setNewsCategories] = useState([]);
+  const [newNewsCategory, setNewNewsCategory] = useState("");
 
   const homeSectionOptions = [
     { value: "hero_images", label: "Home Banner Images" },
@@ -135,8 +137,18 @@ const PageEditor = () => {
     if (!isNewsArticles) return;
     setSectionKey("news_articles");
     loadItems("news_articles");
+    loadNewsCategories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isNewsArticles, slug]);
+
+  const loadNewsCategories = async () => {
+    try {
+      const res = await adminApi.getNewsCategories();
+      setNewsCategories(res.data || []);
+    } catch {
+      setNewsCategories([]);
+    }
+  };
 
   useEffect(() => {
     if (!isFaqs) return;
@@ -288,6 +300,34 @@ const PageEditor = () => {
       setItems((prev) => prev.filter((item) => item.id !== id));
     } catch (err) {
       setItemsMessage(err.message || "Delete failed");
+    }
+  };
+
+  const addNewsCategory = async () => {
+    const name = String(newNewsCategory || "").trim();
+    if (!name) {
+      setItemsMessage("Enter category name.");
+      return;
+    }
+    setItemsMessage("");
+    try {
+      await adminApi.createNewsCategory({ name, is_active: true, sort_order: newsCategories.length + 1 });
+      setNewNewsCategory("");
+      await loadNewsCategories();
+      setItemsMessage("Category added.");
+    } catch (err) {
+      setItemsMessage(err.message || "Failed to add category");
+    }
+  };
+
+  const deleteNewsCategory = async (id) => {
+    setItemsMessage("");
+    try {
+      await adminApi.deleteNewsCategory(id);
+      await loadNewsCategories();
+      setItemsMessage("Category deleted.");
+    } catch (err) {
+      setItemsMessage(err.message || "Failed to delete category");
     }
   };
 
@@ -444,6 +484,28 @@ const PageEditor = () => {
             </div>
           )}
         </div>
+
+        {isNewsArticles && (
+          <div className="panel">
+            <div className="panel-title">News Categories</div>
+            <div className="row">
+              <input
+                placeholder="New category name"
+                value={newNewsCategory}
+                onChange={(e) => setNewNewsCategory(e.target.value)}
+              />
+              <button className="primary" onClick={addNewsCategory}>Add Category</button>
+            </div>
+            <div className="chip-list">
+              {newsCategories.map((cat) => (
+                <div key={cat.id} className="chip">
+                  <span>{cat.name}</span>
+                  <button className="danger" onClick={() => deleteNewsCategory(cat.id)}>Delete</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
           <div className="panel">
             <div className="panel-title">
@@ -628,13 +690,14 @@ const PageEditor = () => {
                   {isNewsArticles && (
                     <select
                       className="news-tag"
-                      value={item.tag || "News"}
+                      value={item.tag || (newsCategories[0]?.name || "News")}
                       onChange={(e) => updateItemField(item.id, "tag", e.target.value)}
                     >
-                      <option value="News">News</option>
-                      <option value="Opinion">Opinion</option>
-                      <option value="Research">Research</option>
-                      <option value="Data">Data</option>
+                      {newsCategories.length ? newsCategories.map((cat) => (
+                        <option key={cat.id} value={cat.name}>{cat.name}</option>
+                      )) : (
+                        <option value="News">News</option>
+                      )}
                     </select>
                   )}
                   {isNewsArticles && (
@@ -1046,6 +1109,26 @@ const Wrap = styled.div`
     gap: var(--space-3);
     flex-wrap: wrap;
     margin-bottom: var(--space-4);
+  }
+
+  .chip-list {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    background: #f3f4f6;
+    border: 1px solid var(--color-dark-200);
+    border-radius: var(--radius-full);
+    padding: 6px 10px;
+  }
+
+  .chip .danger {
+    padding: 6px 10px;
   }
 
   .hint {

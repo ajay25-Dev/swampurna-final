@@ -101,6 +101,21 @@ export const adminApi = {
   getTrackerUsers: () => request("/api/admin/period-tracker/users"),
   getTrackerUserDetails: (userId, month = "") =>
     request(`/api/admin/period-tracker/user/${encodeURIComponent(userId)}/details?month=${encodeURIComponent(month)}`),
+  getNewsCategories: () => request("/api/admin/news-categories"),
+  createNewsCategory: (payload) =>
+    request("/api/admin/news-categories", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateNewsCategory: (id, payload) =>
+    request(`/api/admin/news-categories/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  deleteNewsCategory: (id) =>
+    request(`/api/admin/news-categories/${id}`, {
+      method: "DELETE",
+    }),
   importJanAushadhiKendras: async (file) => {
     const form = new FormData();
     form.append("file", file);

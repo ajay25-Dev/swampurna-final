@@ -958,6 +958,57 @@ app.get("/api/health", (req, res) => {
   res.json({ ok: true });
 });
 
+app.get("/api/public/news-categories", async (_req, res) => {
+  const { data, error } = await supabase
+    .from("news_categories")
+    .select("*")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  return res.json({ data: data || [] });
+});
+
+app.get("/api/public/newsarticles/categories", async (_req, res) => {
+  const { data: categories, error: categoriesError } = await supabase
+    .from("news_categories")
+    .select("id, name, slug, sort_order, is_active")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (categoriesError) {
+    return res.status(400).json({ error: categoriesError.message });
+  }
+
+  const { data: articles, error: articlesError } = await supabase
+    .from("content_items")
+    .select("id, tag")
+    .eq("page_slug", "Newsarticles")
+    .eq("section_key", "news_articles");
+
+  if (articlesError) {
+    return res.status(400).json({ error: articlesError.message });
+  }
+
+  const counts = new Map();
+  for (const article of articles || []) {
+    const key = String(article.tag || "").trim().toLowerCase();
+    if (!key) continue;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+
+  const data = (categories || []).map((cat) => ({
+    ...cat,
+    articles_count: counts.get(String(cat.name || "").trim().toLowerCase()) || 0,
+  }));
+
+  return res.json({ data });
+});
+
 app.get("/api/public/newsarticles", async (req, res) => {
   const { data, error } = await supabase
     .from("content_items")
@@ -976,6 +1027,122 @@ app.get("/api/public/newsarticles", async (req, res) => {
   }));
 
   return res.json({ data: articles });
+});
+
+app.get("/api/public/newsarticles/category/:categorySlug", async (req, res) => {
+  const categorySlug = String(req.params.categorySlug || "").trim().toLowerCase();
+  if (!categorySlug) {
+    return res.status(400).json({ error: "categorySlug is required" });
+  }
+
+  const { data: category, error: categoryError } = await supabase
+    .from("news_categories")
+    .select("id, name, slug, sort_order, is_active")
+    .eq("slug", categorySlug)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (categoryError) {
+    return res.status(400).json({ error: categoryError.message });
+  }
+  if (!category) {
+    return res.status(404).json({ error: "Category not found" });
+  }
+
+  const { data, error } = await supabase
+    .from("content_items")
+    .select("*")
+    .eq("page_slug", "Newsarticles")
+    .eq("section_key", "news_articles")
+    .eq("tag", category.name)
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const articles = (data || []).map((item, index) => ({
+    ...item,
+    slug: buildNewsSlug(item, index),
+  }));
+
+  return res.json({ category, data: articles });
+});
+
+app.get("/api/admin/news-categories", authRequired, async (_req, res) => {
+  const { data, error } = await supabase
+    .from("news_categories")
+    .select("*")
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  return res.json({ data: data || [] });
+});
+
+app.post("/api/admin/news-categories", authRequired, async (req, res) => {
+  const { name, sort_order, is_active } = req.body || {};
+  const cleanName = String(name || "").trim();
+  if (!cleanName) {
+    return res.status(400).json({ error: "name is required" });
+  }
+  const cleanSlug = slugify(cleanName);
+  if (!cleanSlug) {
+    return res.status(400).json({ error: "Invalid category name" });
+  }
+
+  const { data, error } = await supabase
+    .from("news_categories")
+    .insert({
+      name: cleanName,
+      slug: cleanSlug,
+      sort_order: Number.isFinite(Number(sort_order)) ? Number(sort_order) : 0,
+      is_active: is_active === undefined ? true : !!is_active,
+    })
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to create category" });
+  }
+  return res.json({ data });
+});
+
+app.put("/api/admin/news-categories/:id", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const { name, sort_order, is_active } = req.body || {};
+  const updates = {};
+
+  if (name !== undefined) {
+    const cleanName = String(name || "").trim();
+    if (!cleanName) return res.status(400).json({ error: "name cannot be empty" });
+    updates.name = cleanName;
+    updates.slug = slugify(cleanName);
+  }
+  if (sort_order !== undefined) updates.sort_order = Number.isFinite(Number(sort_order)) ? Number(sort_order) : 0;
+  if (is_active !== undefined) updates.is_active = !!is_active;
+
+  const { data, error } = await supabase
+    .from("news_categories")
+    .update(updates)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to update category" });
+  }
+  return res.json({ data });
+});
+
+app.delete("/api/admin/news-categories/:id", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const { error } = await supabase.from("news_categories").delete().eq("id", id);
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  return res.json({ ok: true });
 });
 
 app.get("/api/public/newsarticles/:slug", async (req, res) => {
@@ -1623,6 +1790,11 @@ app.get("/api/v1/auth/me", apiAuthRequired, async (req, res) => {
   }
 
   return res.json({ user });
+});
+
+app.post("/api/v1/auth/logout", apiAuthRequired, (_req, res) => {
+  // JWT is stateless; mobile/web clients should remove bearer token locally.
+  return res.json({ ok: true, message: "Logged out. Remove token on client." });
 });
 
 const ONBOARDING_SOURCE_VALUES = [

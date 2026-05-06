@@ -64,6 +64,47 @@
       }
     },
     {
+      "name": "News - Categories",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/public/newsarticles/categories",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "public",
+            "newsarticles",
+            "categories"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "News - List By Category Slug",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/public/newsarticles/category/{{categorySlug}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "public",
+            "newsarticles",
+            "category",
+            "{{categorySlug}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
       "name": "Competition Events - List",
       "request": {
         "method": "GET",
@@ -169,6 +210,10 @@
     {
       "key": "eventSlug",
       "value": ""
+    },
+    {
+      "key": "categorySlug",
+      "value": "news"
     }
   ]
 }
