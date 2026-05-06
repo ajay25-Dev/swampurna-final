@@ -7,6 +7,7 @@ export const ROUTES = [
     { path: '/admin/cycle-snaps', loader: () => import('../pages/admin/CycleSnaps') },
     { path: '/admin/testimonials', loader: () => import('../pages/admin/TestimonialsModeration') },
     { path: '/admin/tracker-details', loader: () => import('../pages/admin/TrackerDetails') },
+    { path: '/admin/jan-aushadhi-kendras', loader: () => import('../pages/admin/JanAushadhiKendras') },
     { path: '/admin/pages/:slug', loader: () => import('../pages/admin/PageEditor') },
     { path: '/Whoweare', loader: () => import('../pages/Whoweare') },
     { path: '/Missionvision', loader: () => import('../pages/Missionvision') },

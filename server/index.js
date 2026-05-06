@@ -13,6 +13,7 @@ import jwt from "jsonwebtoken";
 import multer from "multer";
 import { createClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
+import xlsx from "xlsx";
 
 dotenv.config({ path: "server/.env.server" });
 
@@ -571,6 +572,29 @@ async function verifyOtpAndIssueSession({ email, otp, purpose, ip }) {
 
 function isValidReminderType(value) {
   return ["period", "pre_period", "post_period", "peak_ovulation", "custom"].includes(String(value || ""));
+}
+
+function normalizeKendraRow(row = {}) {
+  const srNo = row.sr_no ?? row.srno ?? row["sr no"] ?? row["sr_no"] ?? row["Sr No"] ?? row["SrNo"];
+  const kendraCode = row.kendra_code ?? row["kendra code"] ?? row["Kendra Code"];
+  const name = row.name ?? row["Name"];
+  const stateName = row.state_name ?? row.state ?? row["state name"] ?? row["State Name"];
+  const districtName = row.district_name ?? row.district ?? row["district name"] ?? row["District Name"];
+  const pinCode = row.pin_code ?? row.pincode ?? row["pin code"] ?? row["Pin Code"];
+  const address = row.address ?? row["Address"];
+
+  const normalized = {
+    sr_no: Number.isFinite(Number(srNo)) ? Number(srNo) : null,
+    kendra_code: kendraCode ? String(kendraCode).trim() : "",
+    name: name ? String(name).trim() : "",
+    state_name: stateName ? String(stateName).trim() : "",
+    district_name: districtName ? String(districtName).trim() : null,
+    pin_code: pinCode ? String(pinCode).trim() : null,
+    address: address ? String(address).trim() : null,
+    is_active: true,
+  };
+
+  return normalized;
 }
 
 function isValidRepeatType(value) {
@@ -2514,8 +2538,13 @@ app.post("/api/v1/period-tracker/symptoms", apiAuthRequired, async (req, res) =>
     track_date,
     symptoms,
     flow_intensity,
+    spotting,
     pain_level,
+    pain_type,
     mood,
+    sleep_quality,
+    sex_life,
+    energy_level,
     notes,
   } = req.body || {};
 
@@ -2534,8 +2563,13 @@ app.post("/api/v1/period-tracker/symptoms", apiAuthRequired, async (req, res) =>
     track_date: String(track_date),
     symptoms: normalizeSymptomArray(symptoms),
     flow_intensity: flow_intensity ? String(flow_intensity).trim().toLowerCase() : null,
+    spotting: spotting ? String(spotting).trim().toLowerCase() : null,
     pain_level: pain_level === undefined || pain_level === null ? null : Number(pain_level),
+    pain_type: pain_type ? String(pain_type).trim().toLowerCase() : null,
     mood: mood ? String(mood).trim() : null,
+    sleep_quality: sleep_quality ? String(sleep_quality).trim().toLowerCase() : null,
+    sex_life: sex_life ? String(sex_life).trim().toLowerCase() : null,
+    energy_level: energy_level ? String(energy_level).trim().toLowerCase() : null,
     notes: notes ? String(notes).trim() : null,
   };
 
@@ -2603,8 +2637,13 @@ app.put("/api/v1/period-tracker/symptoms/:id", apiAuthRequired, async (req, res)
     track_date,
     symptoms,
     flow_intensity,
+    spotting,
     pain_level,
+    pain_type,
     mood,
+    sleep_quality,
+    sex_life,
+    energy_level,
     notes,
   } = req.body || {};
 
@@ -2621,6 +2660,9 @@ app.put("/api/v1/period-tracker/symptoms/:id", apiAuthRequired, async (req, res)
   if (flow_intensity !== undefined) {
     updates.flow_intensity = flow_intensity ? String(flow_intensity).trim().toLowerCase() : null;
   }
+  if (spotting !== undefined) {
+    updates.spotting = spotting ? String(spotting).trim().toLowerCase() : null;
+  }
   if (pain_level !== undefined) {
     if (pain_level !== null) {
       const numericPain = Number(pain_level);
@@ -2632,7 +2674,19 @@ app.put("/api/v1/period-tracker/symptoms/:id", apiAuthRequired, async (req, res)
       updates.pain_level = null;
     }
   }
+  if (pain_type !== undefined) {
+    updates.pain_type = pain_type ? String(pain_type).trim().toLowerCase() : null;
+  }
   if (mood !== undefined) updates.mood = mood ? String(mood).trim() : null;
+  if (sleep_quality !== undefined) {
+    updates.sleep_quality = sleep_quality ? String(sleep_quality).trim().toLowerCase() : null;
+  }
+  if (sex_life !== undefined) {
+    updates.sex_life = sex_life ? String(sex_life).trim().toLowerCase() : null;
+  }
+  if (energy_level !== undefined) {
+    updates.energy_level = energy_level ? String(energy_level).trim().toLowerCase() : null;
+  }
   if (notes !== undefined) updates.notes = notes ? String(notes).trim() : null;
 
   const { data, error } = await supabase
@@ -3596,6 +3650,94 @@ app.get("/api/admin/period-tracker/user/:userId/details", authRequired, async (r
         notifSettingsRes.error ? `notification_settings: ${notifSettingsRes.error.message}` : null,
       ].filter(Boolean),
     },
+  });
+});
+
+app.post("/api/admin/jan-aushadhi-kendras/import", authRequired, upload.single("file"), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "file is required (csv/xlsx/xls)" });
+  }
+
+  const fileName = String(req.file.originalname || "").toLowerCase();
+  const isCsv = fileName.endsWith(".csv");
+  const isXlsx = fileName.endsWith(".xlsx") || fileName.endsWith(".xls");
+  if (!isCsv && !isXlsx) {
+    return res.status(400).json({ error: "Only .csv, .xlsx, .xls files are supported" });
+  }
+
+  let rows = [];
+  try {
+    const workbook = xlsx.read(req.file.buffer, { type: "buffer" });
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    rows = xlsx.utils.sheet_to_json(firstSheet, { defval: "" });
+  } catch {
+    return res.status(400).json({ error: "Failed to parse file" });
+  }
+
+  if (!rows.length) {
+    return res.status(400).json({ error: "No rows found in file" });
+  }
+
+  const normalizedRows = rows
+    .map(normalizeKendraRow)
+    .filter((row) => row.kendra_code && row.name && row.state_name);
+
+  if (!normalizedRows.length) {
+    return res.status(400).json({
+      error: "No valid rows found. Required columns: kendra_code, name, state_name",
+    });
+  }
+
+  const { data, error } = await supabase
+    .from("jan_aushadhi_kendras")
+    .upsert(normalizedRows, { onConflict: "kendra_code" })
+    .select("id, kendra_code");
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  return res.json({
+    message: "Import completed",
+    meta: {
+      total_rows: rows.length,
+      valid_rows: normalizedRows.length,
+      upserted_rows: (data || []).length,
+    },
+    data: data || [],
+  });
+});
+
+app.get("/api/v1/jan-aushadhi-kendras", async (req, res) => {
+  const state = req.query.state ? String(req.query.state).trim() : null;
+  const district = req.query.district ? String(req.query.district).trim() : null;
+  const pin = req.query.pin ? String(req.query.pin).trim() : null;
+  const name = req.query.name ? String(req.query.name).trim() : null;
+  const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+
+  let query = supabase
+    .from("jan_aushadhi_kendras")
+    .select("*")
+    .eq("is_active", true)
+    .order("state_name", { ascending: true })
+    .order("district_name", { ascending: true })
+    .order("name", { ascending: true })
+    .range(offset, offset + limit - 1);
+
+  if (state) query = query.ilike("state_name", `%${state}%`);
+  if (district) query = query.ilike("district_name", `%${district}%`);
+  if (pin) query = query.ilike("pin_code", `%${pin}%`);
+  if (name) query = query.or(`name.ilike.%${name}%,kendra_code.ilike.%${name}%`);
+
+  const { data, error } = await query;
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  return res.json({
+    data: data || [],
+    meta: { state, district, pin, name, limit, offset },
   });
 });
 

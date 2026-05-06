@@ -351,7 +351,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"track_date\": \"2026-04-10\",\n  \"symptoms\": [\"cramps\", \"bloating\", \"fatigue\"],\n  \"flow_intensity\": \"medium\",\n  \"pain_level\": 6,\n  \"mood\": \"irritable\",\n  \"notes\": \"Mild discomfort in morning\"\n}"
+          "raw": "{\n  \"track_date\": \"2026-04-03\",\n  \"symptoms\": [\n    \"cramps\",\n    \"bloating\",\n    \"fatigue\"\n  ],\n  \"flow_intensity\": \"medium\",\n  \"spotting\": \"brown\",\n  \"pain_level\": 6,\n  \"pain_type\": \"cramps\",\n  \"mood\": \"Mood Swings\",\n  \"sleep_quality\": \"trouble_falling_asleep\",\n  \"sex_life\": \"protected\",\n  \"energy_level\": \"low\",\n  \"notes\": \"Pain after lunch\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/period-tracker/symptoms",
@@ -467,7 +467,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"pain_level\": 4,\n  \"mood\": \"better\",\n  \"symptoms\": [\"mild cramps\"],\n  \"notes\": \"Improved by evening\"\n}"
+          "raw": "{\n  \"pain_level\": 4,\n  \"pain_type\": \"pain_free\",\n  \"mood\": \"Fine\",\n  \"sleep_quality\": \"woke_up_refreshed\",\n  \"sex_life\": \"unprotected\",\n  \"energy_level\": \"high\",\n  \"notes\": \"Improved\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/period-tracker/symptoms/{{symptomId}}",

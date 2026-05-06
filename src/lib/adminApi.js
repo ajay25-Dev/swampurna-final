@@ -101,4 +101,22 @@ export const adminApi = {
   getTrackerUsers: () => request("/api/admin/period-tracker/users"),
   getTrackerUserDetails: (userId, month = "") =>
     request(`/api/admin/period-tracker/user/${encodeURIComponent(userId)}/details?month=${encodeURIComponent(month)}`),
+  importJanAushadhiKendras: async (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(withBase("/api/admin/jan-aushadhi-kendras/import"), {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || "Import failed");
+    }
+    return data;
+  },
+  searchJanAushadhiKendras: ({ state = "", district = "", pin = "", name = "", limit = 100, offset = 0 } = {}) =>
+    request(
+      `/api/v1/jan-aushadhi-kendras?state=${encodeURIComponent(state)}&district=${encodeURIComponent(district)}&pin=${encodeURIComponent(pin)}&name=${encodeURIComponent(name)}&limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`
+    ),
 };

@@ -100,6 +100,9 @@ const AdminLayout = ({ children }) => {
             <NavLink to="/admin/tracker-details" className="nav-link" onClick={() => setSidebarOpen(false)}>
               Tracker Details
             </NavLink>
+            <NavLink to="/admin/jan-aushadhi-kendras" className="nav-link" onClick={() => setSidebarOpen(false)}>
+              Jan Aushadhi Kendras
+            </NavLink>
             <NavLink style={{ marginBottom:"10px" }} to="/admin/pages/Home" className="nav-link" onClick={() => setSidebarOpen(false)}>
               Home Banner
             </NavLink>

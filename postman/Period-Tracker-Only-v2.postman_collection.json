@@ -1,0 +1,811 @@
+{
+  "info": {
+    "name": "Swampurna Period Tracker APIs (Only)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Get Setup",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/setup",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "setup"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "2. Create Setup",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/setup",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "setup"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"last_period_start_date\": \"2026-04-01\",\n  \"period_end_date\": \"2026-04-05\",\n  \"selected_dates\": [\n    \"2026-04-01\",\n    \"2026-04-02\",\n    \"2026-04-03\",\n    \"2026-04-04\",\n    \"2026-04-05\"\n  ],\n  \"has_no_idea\": false,\n  \"cycle_length_days\": 28,\n  \"period_length_days\": 5,\n  \"pre_period_days\": 2,\n  \"post_period_days\": 2,\n  \"ovulation_start_day\": 11,\n  \"ovulation_window_days\": 5,\n  \"notes\": \"Initial setup\"\n}"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "3. Update Setup",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/setup",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "setup"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cycle_length_days\": 30,\n  \"period_length_days\": 5,\n  \"notes\": \"Updated\"\n}"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "4. Get Summary",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/summary?month=2026-04",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "summary"
+          ],
+          "query": [
+            {
+              "key": "month",
+              "value": "2026-04"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "5. Create Log",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/logs",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "logs"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"period_start_date\": \"2026-04-01\",\n  \"period_end_date\": \"2026-04-05\",\n  \"selected_dates\": [\n    \"2026-04-01\",\n    \"2026-04-02\"\n  ],\n  \"has_no_idea\": false,\n  \"cycle_length_days\": 28,\n  \"period_length_days\": 5,\n  \"notes\": \"Cycle log\"\n}"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "6. List Logs",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/logs?limit=50&offset=0",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "logs"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "50"
+            },
+            {
+              "key": "offset",
+              "value": "0"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "7. Get Log By ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/logs/{{logId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "logs",
+            "{{logId}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "8. Update Log",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/logs/{{logId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "logs",
+            "{{logId}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"period_end_date\": \"2026-04-06\",\n  \"notes\": \"Updated log\"\n}"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "9. Delete Log",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/logs/{{logId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "logs",
+            "{{logId}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "10. Upsert Symptoms",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/symptoms",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "symptoms"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"track_date\": \"2026-04-03\",\n  \"symptoms\": [\n    \"cramps\",\n    \"bloating\",\n    \"fatigue\"\n  ],\n  \"flow_intensity\": \"medium\",\n  \"spotting\": \"brown\",\n  \"pain_level\": 6,\n  \"pain_type\": \"cramps\",\n  \"mood\": \"Mood Swings\",\n  \"sleep_quality\": \"trouble_falling_asleep\",\n  \"sex_life\": \"protected\",\n  \"energy_level\": \"low\",\n  \"notes\": \"Pain after lunch\"\n}"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "11. List Symptoms",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/symptoms?from=2026-04-01&to=2026-04-30&limit=50&offset=0",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "symptoms"
+          ],
+          "query": [
+            {
+              "key": "from",
+              "value": "2026-04-01"
+            },
+            {
+              "key": "to",
+              "value": "2026-04-30"
+            },
+            {
+              "key": "limit",
+              "value": "50"
+            },
+            {
+              "key": "offset",
+              "value": "0"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "12. Get Symptom By ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/symptoms/{{symptomId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "symptoms",
+            "{{symptomId}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "13. Update Symptom",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/symptoms/{{symptomId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "symptoms",
+            "{{symptomId}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"pain_level\": 4,\n  \"pain_type\": \"pain_free\",\n  \"mood\": \"Fine\",\n  \"sleep_quality\": \"woke_up_refreshed\",\n  \"sex_life\": \"unprotected\",\n  \"energy_level\": \"high\",\n  \"notes\": \"Improved\"\n}"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "14. Delete Symptom",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/symptoms/{{symptomId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "symptoms",
+            "{{symptomId}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "15. Create Reminder (Period)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/reminders",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "reminders"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reminder_type\": \"period\",\n  \"title\": \"Period Reminder\",\n  \"message\": \"Your period may start soon\",\n  \"reminder_time\": \"09:00\",\n  \"days_before\": 1,\n  \"repeat_type\": \"monthly\",\n  \"is_enabled\": true\n}"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "16. Create Reminder (Custom)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/reminders",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "reminders"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reminder_type\": \"custom\",\n  \"title\": \"Doctor Visit\",\n  \"message\": \"Appointment today\",\n  \"reminder_time\": \"10:30\",\n  \"custom_date\": \"2026-05-02\",\n  \"repeat_type\": \"none\",\n  \"is_enabled\": true\n}"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "17. List Reminders",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/reminders",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "reminders"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "18. Get Reminder By ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/reminders/{{reminderId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "reminders",
+            "{{reminderId}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "19. Update Reminder",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/reminders/{{reminderId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "reminders",
+            "{{reminderId}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"is_enabled\": false,\n  \"reminder_time\": \"08:30\"\n}"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "20. Delete Reminder",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/reminders/{{reminderId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "reminders",
+            "{{reminderId}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "21. Upcoming Reminders",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/reminders/upcoming?days=7",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "reminders",
+            "upcoming"
+          ],
+          "query": [
+            {
+              "key": "days",
+              "value": "7"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "22. Queue Reminder Dispatch",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/reminders/dispatch/queue",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "reminders",
+            "dispatch",
+            "queue"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"days\": 2\n}"
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "23. List Dispatch Queue",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/period-tracker/reminders/dispatch/queue?status=pending&limit=50&offset=0",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "period-tracker",
+            "reminders",
+            "dispatch",
+            "queue"
+          ],
+          "query": [
+            {
+              "key": "status",
+              "value": "pending"
+            },
+            {
+              "key": "limit",
+              "value": "50"
+            },
+            {
+              "key": "offset",
+              "value": "0"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "24. Get Notification Settings",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/notifications/settings",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "notifications",
+            "settings"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "25. Update Notification Settings",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/notifications/settings",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "notifications",
+            "settings"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"period_reminder_enabled\": true,\n  \"ovulation_reminder_enabled\": true,\n  \"daily_insights_enabled\": true,\n  \"daily_period_reminder_enabled\": false,\n  \"app_updates_enabled\": true\n}"
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://swampurna-final-production.up.railway.app"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "logId",
+      "value": ""
+    },
+    {
+      "key": "symptomId",
+      "value": ""
+    },
+    {
+      "key": "reminderId",
+      "value": ""
+    }
+  ]
+}
