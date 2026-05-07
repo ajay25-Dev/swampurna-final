@@ -1,0 +1,253 @@
+{
+  "info": {
+    "name": "Swampurna News Categories & Articles APIs",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Public - Categories With Counts",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/public/newsarticles/categories",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "public",
+            "newsarticles",
+            "categories"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Public - Categories List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/public/news-categories",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "public",
+            "news-categories"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Public - Articles By Category ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/public/newsarticles?category_id={{categoryId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "public",
+            "newsarticles"
+          ],
+          "query": [
+            {
+              "key": "category_id",
+              "value": "{{categoryId}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Public - Articles By Category Slug (Legacy)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/public/newsarticles/category/{{categorySlug}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "public",
+            "newsarticles",
+            "category",
+            "{{categorySlug}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Public - Article Detail By Slug",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/public/newsarticles/{{articleSlug}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "public",
+            "newsarticles",
+            "{{articleSlug}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Admin - Get News Categories",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Cookie",
+            "value": "admin_token={{adminToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/news-categories",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "admin",
+            "news-categories"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Admin - Create News Category",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Cookie",
+            "value": "admin_token={{adminToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Trending Now\",\n  \"sort_order\": 1,\n  \"is_active\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/news-categories",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "admin",
+            "news-categories"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Admin - Update News Category",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Cookie",
+            "value": "admin_token={{adminToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"When to Track Your Cycle\",\n  \"sort_order\": 2,\n  \"is_active\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/news-categories/{{newsCategoryId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "admin",
+            "news-categories",
+            "{{newsCategoryId}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Admin - Delete News Category",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Cookie",
+            "value": "admin_token={{adminToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/admin/news-categories/{{newsCategoryId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "admin",
+            "news-categories",
+            "{{newsCategoryId}}"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://swampurna-final-production.up.railway.app"
+    },
+    {
+      "key": "categoryId",
+      "value": ""
+    },
+    {
+      "key": "categorySlug",
+      "value": "trending-now"
+    },
+    {
+      "key": "articleSlug",
+      "value": ""
+    },
+    {
+      "key": "newsCategoryId",
+      "value": ""
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    }
+  ]
+}

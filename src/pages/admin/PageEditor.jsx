@@ -247,6 +247,20 @@ const PageEditor = () => {
   const saveItem = async (item) => {
     setItemsMessage("");
     const payload = { ...item };
+    if (isNewsArticles) {
+      const selectedCategory =
+        newsCategories.find((cat) => cat.id === item.category_id) ||
+        newsCategories.find(
+          (cat) =>
+            String(cat.name || "").trim().toLowerCase() ===
+            String(item.category || item.tag || "").trim().toLowerCase()
+        ) ||
+        newsCategories[0] ||
+        null;
+      payload.category_id = selectedCategory?.id || null;
+      payload.category = selectedCategory?.name || item.category || item.tag || "News";
+      payload.tag = payload.tag || payload.category;
+    }
     delete payload.id;
     delete payload.created_at;
     try {
@@ -282,6 +296,8 @@ const PageEditor = () => {
         image_url: isPhotoGallery ? uploadUrl : isVideoGallery ? "" : (isImpactStory || isNewsArticles || isCompetitionEvent) ? "" : undefined,
         description: isFaqs ? "New answer..." : undefined,
         tag: isFaqs ? "active" : isMythsTaboos ? "active" : undefined,
+        category_id: isNewsArticles ? (newsCategories[0]?.id || null) : undefined,
+        category: isNewsArticles ? (newsCategories[0]?.name || "News") : undefined,
         subtitle: isCompetitionEvent ? "Event Date" : undefined,
         link_url: isCompetitionEvent ? "" : undefined,
         meta: isCompetitionEvent ? { location: "", buttonText: "Register Now", color: "primary" } : undefined,
@@ -690,13 +706,18 @@ const PageEditor = () => {
                   {isNewsArticles && (
                     <select
                       className="news-tag"
-                      value={item.tag || (newsCategories[0]?.name || "News")}
-                      onChange={(e) => updateItemField(item.id, "tag", e.target.value)}
+                      value={item.category_id || ""}
+                      onChange={(e) => {
+                        const selected = newsCategories.find((cat) => cat.id === e.target.value);
+                        updateItemField(item.id, "category_id", e.target.value || null);
+                        updateItemField(item.id, "category", selected?.name || "");
+                        updateItemField(item.id, "tag", selected?.name || "");
+                      }}
                     >
                       {newsCategories.length ? newsCategories.map((cat) => (
-                        <option key={cat.id} value={cat.name}>{cat.name}</option>
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
                       )) : (
-                        <option value="News">News</option>
+                        <option value="">No categories</option>
                       )}
                     </select>
                   )}

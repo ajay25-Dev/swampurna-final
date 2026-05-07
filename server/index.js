@@ -986,7 +986,7 @@ app.get("/api/public/newsarticles/categories", async (_req, res) => {
 
   const { data: articles, error: articlesError } = await supabase
     .from("content_items")
-    .select("id, tag")
+    .select("id, category_id, category, tag")
     .eq("page_slug", "Newsarticles")
     .eq("section_key", "news_articles");
 
@@ -994,22 +994,34 @@ app.get("/api/public/newsarticles/categories", async (_req, res) => {
     return res.status(400).json({ error: articlesError.message });
   }
 
+  const categoriesByName = new Map(
+    (categories || []).map((cat) => [String(cat.name || "").trim().toLowerCase(), cat.id])
+  );
   const counts = new Map();
   for (const article of articles || []) {
-    const key = String(article.tag || "").trim().toLowerCase();
-    if (!key) continue;
-    counts.set(key, (counts.get(key) || 0) + 1);
+    const keyById = article.category_id ? String(article.category_id) : "";
+    if (keyById) {
+      counts.set(keyById, (counts.get(keyById) || 0) + 1);
+      continue;
+    }
+    const legacyKey = String(article.category || article.tag || "").trim().toLowerCase();
+    const mappedCategoryId = categoriesByName.get(legacyKey);
+    if (mappedCategoryId) {
+      counts.set(mappedCategoryId, (counts.get(mappedCategoryId) || 0) + 1);
+    }
   }
 
   const data = (categories || []).map((cat) => ({
     ...cat,
-    articles_count: counts.get(String(cat.name || "").trim().toLowerCase()) || 0,
+    articles_count: counts.get(String(cat.id)) || 0,
   }));
 
   return res.json({ data });
 });
 
 app.get("/api/public/newsarticles", async (req, res) => {
+  const category = req.query.category ? String(req.query.category).trim().toLowerCase() : "";
+  const categoryId = req.query.category_id ? String(req.query.category_id).trim() : "";
   const { data, error } = await supabase
     .from("content_items")
     .select("*")
@@ -1021,10 +1033,17 @@ app.get("/api/public/newsarticles", async (req, res) => {
     return res.status(400).json({ error: error.message });
   }
 
-  const articles = (data || []).map((item, index) => ({
+  let articles = (data || []).map((item, index) => ({
     ...item,
     slug: buildNewsSlug(item, index),
   }));
+  if (categoryId) {
+    articles = articles.filter((item) => String(item.category_id || "") === categoryId);
+  } else if (category) {
+    articles = articles.filter(
+      (item) => String(item.category || item.tag || "").trim().toLowerCase() === category
+    );
+  }
 
   return res.json({ data: articles });
 });
@@ -1054,17 +1073,22 @@ app.get("/api/public/newsarticles/category/:categorySlug", async (req, res) => {
     .select("*")
     .eq("page_slug", "Newsarticles")
     .eq("section_key", "news_articles")
-    .eq("tag", category.name)
     .order("sort_order", { ascending: true });
 
   if (error) {
     return res.status(400).json({ error: error.message });
   }
 
-  const articles = (data || []).map((item, index) => ({
+  const articles = (data || [])
+    .filter(
+      (item) =>
+        String(item.category_id || "") === String(category.id) ||
+        String(item.category || item.tag || "").trim().toLowerCase() === String(category.name || "").trim().toLowerCase()
+    )
+    .map((item, index) => ({
     ...item,
     slug: buildNewsSlug(item, index),
-  }));
+    }));
 
   return res.json({ category, data: articles });
 });
