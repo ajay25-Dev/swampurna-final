@@ -1279,6 +1279,114 @@ app.get("/api/public/videogallery", async (req, res) => {
   return res.json({ data: data || [] });
 });
 
+app.post("/api/v1/impactstories/submit", upload.single("file"), async (req, res) => {
+  const full_name = String(req.body?.full_name || "").trim();
+  const email = req.body?.email ? String(req.body.email).trim().toLowerCase() : null;
+  const title = String(req.body?.title || "").trim();
+  const story = String(req.body?.story || "").trim();
+
+  if (!full_name) return res.status(400).json({ error: "full_name is required" });
+  if (!title) return res.status(400).json({ error: "title is required" });
+  if (!story) return res.status(400).json({ error: "story is required" });
+
+  let imageUrl = null;
+  if (req.file) {
+    const fileExt = req.file.originalname.split(".").pop();
+    const fileName = `impact-stories/${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+    const { error: uploadError } = await supabase.storage
+      .from(MEDIA_BUCKET)
+      .upload(fileName, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: false,
+      });
+    if (uploadError) {
+      return res.status(400).json({ error: uploadError.message });
+    }
+    const { data } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(fileName);
+    imageUrl = data.publicUrl;
+  }
+
+  const { data, error } = await supabase
+    .from("impact_story_submissions")
+    .insert({
+      full_name,
+      email,
+      title,
+      story,
+      image_url: imageUrl,
+      status: "pending",
+    })
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to submit story" });
+  }
+
+  return res.json({
+    message: "Story submitted successfully. Admin approval is required before publishing.",
+    data,
+  });
+});
+
+app.get("/api/admin/impactstories/submissions", authRequired, async (req, res) => {
+  const status = req.query.status ? String(req.query.status).trim().toLowerCase() : "";
+  let query = supabase
+    .from("impact_story_submissions")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (status) query = query.eq("status", status);
+  const { data, error } = await query;
+  if (error) return res.status(400).json({ error: error.message });
+  return res.json({ data: data || [] });
+});
+
+app.put("/api/admin/impactstories/submissions/:id/status", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const status = String(req.body?.status || "").trim().toLowerCase();
+  if (!["pending", "approved", "rejected", "published"].includes(status)) {
+    return res.status(400).json({ error: "Invalid status" });
+  }
+  const { data, error } = await supabase
+    .from("impact_story_submissions")
+    .update({ status })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error || !data) return res.status(400).json({ error: error?.message || "Failed to update status" });
+  return res.json({ data });
+});
+
+app.post("/api/admin/impactstories/submissions/:id/publish", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const { data: submission, error: fetchErr } = await supabase
+    .from("impact_story_submissions")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (fetchErr || !submission) return res.status(404).json({ error: "Submission not found" });
+  if (submission.status === "published") return res.status(400).json({ error: "Already published" });
+
+  const { data: item, error: createErr } = await supabase
+    .from("content_items")
+    .insert({
+      page_slug: "Impactstories",
+      section_key: "impact_stories",
+      title: submission.title,
+      description: submission.story,
+      image_url: submission.image_url,
+      meta: { color: "primary", isHeader: false, source: "submission", submission_id: submission.id },
+      sort_order: 0,
+      is_active: true,
+    })
+    .select("*")
+    .single();
+  if (createErr || !item) return res.status(400).json({ error: createErr?.message || "Failed to publish story" });
+
+  await supabase.from("impact_story_submissions").update({ status: "published" }).eq("id", id);
+  return res.json({ message: "Story published", data: item });
+});
+
 app.get("/api/v1/testimonials", async (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
   const offset = Math.max(Number(req.query.offset) || 0, 0);
@@ -2727,6 +2835,177 @@ app.delete("/api/v1/period-tracker/logs/:id", apiAuthRequired, async (req, res) 
     return res.status(400).json({ error: error.message });
   }
   return res.json({ ok: true });
+});
+
+app.get("/api/v1/period-tracker/options", apiAuthRequired, async (_req, res) => {
+  const { data, error } = await supabase
+    .from("period_tracker_options")
+    .select("category_key, category_label, option_key, option_label, purpose, prediction_effect, confidence_impact, sort_order")
+    .eq("is_active", true)
+    .order("category_key", { ascending: true })
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const categoriesMap = new Map();
+  for (const row of data || []) {
+    if (!categoriesMap.has(row.category_key)) {
+      categoriesMap.set(row.category_key, {
+        key: row.category_key,
+        label: row.category_label,
+        purpose: row.purpose,
+        prediction_effect: row.prediction_effect,
+        confidence_impact: row.confidence_impact,
+        options: [],
+      });
+    }
+    categoriesMap.get(row.category_key).options.push({
+      key: row.option_key,
+      label: row.option_label,
+    });
+  }
+
+  return res.json({ data: Array.from(categoriesMap.values()) });
+});
+
+app.get("/api/v1/period-tracker/user-options", apiAuthRequired, async (req, res) => {
+  const { data, error } = await supabase
+    .from("period_tracker_user_options")
+    .select("*")
+    .eq("user_id", req.user.id)
+    .maybeSingle();
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  return res.json({ data: data || { user_id: req.user.id, selections: {} } });
+});
+
+app.put("/api/v1/period-tracker/user-options", apiAuthRequired, async (req, res) => {
+  const selections = req.body?.selections;
+  if (!selections || Array.isArray(selections) || typeof selections !== "object") {
+    return res.status(400).json({ error: "selections must be an object" });
+  }
+
+  const { data: options, error: optionsError } = await supabase
+    .from("period_tracker_options")
+    .select("category_key, option_key")
+    .eq("is_active", true);
+
+  if (optionsError) {
+    return res.status(400).json({ error: optionsError.message });
+  }
+
+  const validOptionsByCategory = new Map();
+  for (const option of options || []) {
+    if (!validOptionsByCategory.has(option.category_key)) {
+      validOptionsByCategory.set(option.category_key, new Set());
+    }
+    validOptionsByCategory.get(option.category_key).add(option.option_key);
+  }
+
+  const normalizedSelections = {};
+  for (const [categoryKey, rawValue] of Object.entries(selections)) {
+    const cleanCategoryKey = String(categoryKey || "").trim().toLowerCase();
+    const validOptions = validOptionsByCategory.get(cleanCategoryKey);
+    if (!validOptions) {
+      return res.status(400).json({ error: `Invalid category: ${categoryKey}` });
+    }
+
+    const rawValues = Array.isArray(rawValue) ? rawValue : [rawValue];
+    const cleanValues = rawValues
+      .map((item) => String(item || "").trim().toLowerCase())
+      .filter(Boolean);
+
+    for (const optionKey of cleanValues) {
+      if (!validOptions.has(optionKey)) {
+        return res.status(400).json({ error: `Invalid option '${optionKey}' for category '${cleanCategoryKey}'` });
+      }
+    }
+
+    normalizedSelections[cleanCategoryKey] = Array.isArray(rawValue) ? [...new Set(cleanValues)] : cleanValues[0] || null;
+  }
+
+  const { data, error } = await supabase
+    .from("period_tracker_user_options")
+    .upsert(
+      {
+        user_id: req.user.id,
+        selections: normalizedSelections,
+      },
+      { onConflict: "user_id" }
+    )
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to update period tracker options" });
+  }
+
+  return res.json({ data });
+});
+
+app.get("/api/v1/period-tracker/articles", apiAuthRequired, async (req, res) => {
+  const category = req.query.category ? String(req.query.category).trim().toLowerCase() : "";
+  const cyclePhase = req.query.cycle_phase ? String(req.query.cycle_phase).trim() : "";
+  const priority = req.query.priority ? String(req.query.priority).trim() : "";
+
+  let query = supabase
+    .from("period_tracker_articles")
+    .select("id, category_key, category_label, slug, title, detail_title, content, cycle_phase, priority, sort_order, created_at, updated_at")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: false });
+
+  if (category) query = query.eq("category_key", category);
+  if (cyclePhase) query = query.ilike("cycle_phase", cyclePhase);
+  if (priority) query = query.ilike("priority", priority);
+
+  const { data, error } = await query;
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  return res.json({ data: data || [], meta: { category: category || null, cycle_phase: cyclePhase || null, priority: priority || null } });
+});
+
+app.get("/api/v1/period-tracker/articles/category/:category", apiAuthRequired, async (req, res) => {
+  const category = String(req.params.category || "").trim().toLowerCase();
+  const { data, error } = await supabase
+    .from("period_tracker_articles")
+    .select("id, category_key, category_label, slug, title, detail_title, content, cycle_phase, priority, sort_order, created_at, updated_at")
+    .eq("is_active", true)
+    .eq("category_key", category)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  return res.json({ data: data || [], meta: { category } });
+});
+
+app.get("/api/v1/period-tracker/articles/:slug", apiAuthRequired, async (req, res) => {
+  const slug = String(req.params.slug || "").trim().toLowerCase();
+  const { data, error } = await supabase
+    .from("period_tracker_articles")
+    .select("id, category_key, category_label, slug, title, detail_title, content, cycle_phase, priority, sort_order, created_at, updated_at")
+    .eq("is_active", true)
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  if (!data) {
+    return res.status(404).json({ error: "Article not found" });
+  }
+
+  return res.json({ data });
 });
 
 app.post("/api/v1/period-tracker/symptoms", apiAuthRequired, async (req, res) => {

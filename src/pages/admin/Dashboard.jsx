@@ -5,7 +5,7 @@ import AdminLayout from "./AdminLayout";
 
 const sections = [
   { label: "CRM", items: ["customers"] },
-  { label: "App Ops", items: ["support-reports", "cycle-snaps", "testimonials", "tracker-details", "jan-aushadhi-kendras"] },
+  { label: "App Ops", items: ["support-reports", "cycle-snaps", "testimonials", "tracker-details", "impactstory-submissions", "jan-aushadhi-kendras"] },
   { label: "Home", items: ["Home"] },
   { label: "About Us", items: ["Whoweare", "Missionvision", "Ourteam", "Ourpartner", "Projecthistory"] },
   { label: "Our Work", items: ["Programinitiative", "Ourapproach", "Impactstories"] },
@@ -40,6 +40,8 @@ const Dashboard = () => {
                               ? "/admin/tracker-details"
                             : item === "jan-aushadhi-kendras"
                               ? "/admin/jan-aushadhi-kendras"
+                            : item === "impactstory-submissions"
+                              ? "/admin/impactstory-submissions"
                             : `/admin/pages/${item}`
                     }
                   >

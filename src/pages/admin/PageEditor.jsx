@@ -65,12 +65,13 @@ const PageEditor = () => {
   const isPhotoGallery = slug === "Photogallery";
   const isVideoGallery = slug === "Videogallery";
   const isImpactStory = slug === "Impactstory";
+  const isImpactStories = slug === "Impactstories";
   const isNewsArticles = slug === "Newsarticles";
   const isFaqs = slug === "Faqs";
   const isCompetitionEvent = slug === "Compitionevent";
   const isMythsTaboos = slug === "Mythstaboos";
   const isMediaGallery = isPhotoGallery || isVideoGallery;
-  const isSpecialEditor = isMediaGallery || isImpactStory || isNewsArticles || isFaqs || isCompetitionEvent || isMythsTaboos;
+  const isSpecialEditor = isMediaGallery || isImpactStory || isImpactStories || isNewsArticles || isFaqs || isCompetitionEvent || isMythsTaboos;
   const [page, setPage] = useState({ title: "", hero_title: "", hero_subtitle: "", hero_image_url: "" });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -132,6 +133,13 @@ const PageEditor = () => {
     loadItems("impact_articles");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isImpactStory, slug]);
+
+  useEffect(() => {
+    if (!isImpactStories) return;
+    setSectionKey("impact_stories");
+    loadItems("impact_stories");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isImpactStories, slug]);
 
   useEffect(() => {
     if (!isNewsArticles) return;
@@ -280,6 +288,8 @@ const PageEditor = () => {
           ? "video_gallery"
         : isImpactStory
           ? "impact_articles"
+            : isImpactStories
+              ? "impact_stories"
             : isNewsArticles
               ? "news_articles"
             : isFaqs
@@ -292,15 +302,15 @@ const PageEditor = () => {
       const res = await adminApi.createItem({
         page_slug: slug,
         section_key: finalSectionKey,
-        title: isPhotoGallery ? "" : isVideoGallery ? "New Video" : isImpactStory ? "New Article" : isNewsArticles ? "New Article" : isFaqs ? "New question?" : isCompetitionEvent ? "New Event" : isMythsTaboos ? "New myth heading" : "New Item",
-        image_url: isPhotoGallery ? uploadUrl : isVideoGallery ? "" : (isImpactStory || isNewsArticles || isCompetitionEvent) ? "" : undefined,
+        title: isPhotoGallery ? "" : isVideoGallery ? "New Video" : isImpactStory ? "New Article" : isImpactStories ? "New Story" : isNewsArticles ? "New Article" : isFaqs ? "New question?" : isCompetitionEvent ? "New Event" : isMythsTaboos ? "New myth heading" : "New Item",
+        image_url: isPhotoGallery ? uploadUrl : isVideoGallery ? "" : (isImpactStory || isImpactStories || isNewsArticles || isCompetitionEvent) ? "" : undefined,
         description: isFaqs ? "New answer..." : undefined,
         tag: isFaqs ? "active" : isMythsTaboos ? "active" : undefined,
+        meta: isImpactStories ? { color: "primary", isHeader: false } : isCompetitionEvent ? { location: "", buttonText: "Register Now", color: "primary" } : undefined,
         category_id: isNewsArticles ? (newsCategories[0]?.id || null) : undefined,
         category: isNewsArticles ? (newsCategories[0]?.name || "News") : undefined,
         subtitle: isCompetitionEvent ? "Event Date" : undefined,
         link_url: isCompetitionEvent ? "" : undefined,
-        meta: isCompetitionEvent ? { location: "", buttonText: "Register Now", color: "primary" } : undefined,
         sort_order: items.length,
       });
       setItems((prev) => [...prev, res.data]);
@@ -413,6 +423,8 @@ const PageEditor = () => {
                   ? "Add video links and manage the video gallery."
                 : isImpactStory
                   ? "Publish and manage Impact Story articles."
+                  : isImpactStories
+                    ? "Use this simple form to add or update each Impact Story."
                     : isNewsArticles
                       ? "Publish and manage News & Article posts."
                       : isFaqs
@@ -468,7 +480,7 @@ const PageEditor = () => {
             </div>
           )}
 
-          {!isImpactStory && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
+          {!isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
             <div className="panel">
               <div className="panel-title">{isVideoGallery ? "Add Video URL" : "Media Upload"}</div>
               {isVideoGallery ? (
@@ -531,6 +543,8 @@ const PageEditor = () => {
                   ? "Gallery Videos"
                   : isImpactStory
                     ? "Impact Articles"
+                    : isImpactStories
+                      ? "Impact Stories"
                     : isNewsArticles
                       ? "News Articles"
                       : isFaqs
@@ -555,6 +569,8 @@ const PageEditor = () => {
                 <input value="video_gallery" readOnly />
               ) : isImpactStory ? (
                 <input value="impact_articles" readOnly />
+              ) : isImpactStories ? (
+                <input value="impact_stories" readOnly />
               ) : isNewsArticles ? (
                 <input value="news_articles" readOnly />
               ) : isFaqs ? (
@@ -580,6 +596,8 @@ const PageEditor = () => {
                   ? "Add Empty Video Row"
                   : isImpactStory
                     ? "Add Article"
+                    : isImpactStories
+                      ? "Add Story"
                     : isNewsArticles
                       ? "Add Article"
                     : isFaqs
@@ -600,7 +618,7 @@ const PageEditor = () => {
                   <div className="id">{item.id}</div>
                 </div>
                 <div
-                  className={`item-grid ${isPhotoGallery ? "gallery-item-grid" : ""} ${isVideoGallery ? "video-item-grid" : ""} ${isImpactStory ? "impact-item-grid" : ""} ${isNewsArticles ? "news-item-grid" : ""} ${isFaqs ? "faq-item-grid" : ""} ${isCompetitionEvent ? "competition-item-grid" : ""} ${isMythsTaboos ? "myths-item-grid" : ""}`}
+                  className={`item-grid ${isPhotoGallery ? "gallery-item-grid" : ""} ${isVideoGallery ? "video-item-grid" : ""} ${isImpactStory || isImpactStories ? "impact-item-grid" : ""} ${isNewsArticles ? "news-item-grid" : ""} ${isFaqs ? "faq-item-grid" : ""} ${isCompetitionEvent ? "competition-item-grid" : ""} ${isMythsTaboos ? "myths-item-grid" : ""}`}
                 >
                   {isPhotoGallery && (
                     <div className="gallery-preview">
@@ -686,6 +704,74 @@ const PageEditor = () => {
                         onChange={(val) => updateItemField(item.id, "description", val)}
                       />
                     </div>
+                  )}
+                  {isImpactStories && (
+                    <input
+                      className="impact-title"
+                      value={item.title || ""}
+                      onChange={(e) => updateItemField(item.id, "title", e.target.value)}
+                      placeholder="Story title"
+                    />
+                  )}
+                  {isImpactStories && (
+                    <div className="impact-item-upload">
+                      <div className="impact-image-preview">
+                        {item.image_url ? (
+                          <img src={item.image_url} alt={item.title || "Story"} />
+                        ) : (
+                          <span>No Image</span>
+                        )}
+                      </div>
+                      <label className="upload-item-btn">
+                        {itemUploadingId === item.id ? "Uploading..." : "Upload Image"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => onItemUpload(item.id, e)}
+                          disabled={itemUploadingId === item.id}
+                        />
+                      </label>
+                      <span className="item-file-name">{getMediaFileName(item.image_url)}</span>
+                    </div>
+                  )}
+                  {isImpactStories && (
+                    <select
+                      className="impact-tag"
+                      value={item.meta?.color || "primary"}
+                      onChange={(e) => updateItemMetaField(item.id, "color", e.target.value)}
+                    >
+                      <option value="primary">Primary</option>
+                      <option value="secondary">Secondary</option>
+                      <option value="accent">Accent</option>
+                    </select>
+                  )}
+                  {isImpactStories && (
+                    <select
+                      className="impact-header"
+                      value={item.meta?.isHeader ? "yes" : "no"}
+                      onChange={(e) => updateItemMetaField(item.id, "isHeader", e.target.value === "yes")}
+                    >
+                      <option value="no">Normal Story</option>
+                      <option value="yes">Header Story</option>
+                    </select>
+                  )}
+                  {isImpactStories && (
+                    <textarea
+                      rows="6"
+                      className="impact-description"
+                      value={item.description || ""}
+                      onChange={(e) => updateItemField(item.id, "description", e.target.value)}
+                      placeholder="Story content"
+                    />
+                  )}
+                  {isImpactStories && (
+                    <input
+                      className="impact-sort"
+                      type="number"
+                      value={item.sort_order ?? 0}
+                      onChange={(e) => updateItemField(item.id, "sort_order", Number(e.target.value))}
+                      placeholder="Sort Order"
+                    />
                   )}
                   {isNewsArticles && (
                     <input
@@ -922,21 +1008,21 @@ const PageEditor = () => {
                       <option value="inactive">Inactive</option>
                     </select>
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
                     <input
                       value={item.title || ""}
                       onChange={(e) => updateItemField(item.id, "title", e.target.value)}
                       placeholder="Title"
                     />
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
                     <input
                       value={item.subtitle || ""}
                       onChange={(e) => updateItemField(item.id, "subtitle", e.target.value)}
                       placeholder="Subtitle"
                     />
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
                     <textarea
                       rows="3"
                       value={item.description || ""}
@@ -944,28 +1030,28 @@ const PageEditor = () => {
                       placeholder="Description"
                     />
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
                     <input
                       value={item.image_url || ""}
                       onChange={(e) => updateItemField(item.id, "image_url", e.target.value)}
                       placeholder="Image URL"
                     />
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
                     <input
                       value={item.link_url || ""}
                       onChange={(e) => updateItemField(item.id, "link_url", e.target.value)}
                       placeholder="Link URL"
                     />
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
                     <input
                       value={item.tag || ""}
                       onChange={(e) => updateItemField(item.id, "tag", e.target.value)}
                       placeholder="Tag"
                     />
                   )}
-                  {!isImpactStory && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
+                  {!isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
                     <input
                       type="number"
                       value={item.sort_order ?? 0}
@@ -982,7 +1068,7 @@ const PageEditor = () => {
                       placeholder="Sort Order"
                     />
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
                     <textarea
                       rows="3"
                       value={item.meta ? JSON.stringify(item.meta) : ""}
@@ -1246,6 +1332,10 @@ const Wrap = styled.div`
 
   .impact-sort {
     grid-column: 3;
+  }
+
+  .impact-header {
+    grid-column: 2;
   }
 
   .news-title {

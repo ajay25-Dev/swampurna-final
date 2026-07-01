@@ -1,13 +1,28 @@
 import React from 'react';
 import styled from 'styled-components';
 import { FiArrowRight } from 'react-icons/fi';
+import { useContentItems } from '../hooks/useContentItems';
 import Storyimg1 from '../assets/images/images1/Storyimg1.jpg';
 import Storyimg2 from '../assets/images/images1/Storyimg2.jpg';
 import Storyimg3 from '../assets/images/images1/Storyimg3.jpg';
 import Storyimg4 from '../assets/images/images1/Storyimg4.jpg';
 
 const Impactstories = () => {
-  const stories = [
+  const [showForm, setShowForm] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [submitMessage, setSubmitMessage] = React.useState('');
+  const [form, setForm] = React.useState({
+    full_name: '',
+    email: '',
+    title: '',
+    story: '',
+    file: null,
+  });
+
+  const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+  const submitUrl = API_BASE_URL ? `${API_BASE_URL}/api/v1/impactstories/submit` : '/api/v1/impactstories/submit';
+
+  const fallbackStories = [
     {
       title: '🏫 The Students of Govt. Sarvodaya Kanya Vidyalaya, Dallupura',
       image: null,
@@ -65,6 +80,49 @@ When we met them, we didn't just ask survey questions. We played games, we drew 
       color: 'accent'
     }
   ];
+
+  const { items } = useContentItems({
+    page: 'Impactstories',
+    section: 'impact_stories',
+    fallback: []
+  });
+
+  const stories = items.length
+    ? items.map((item) => ({
+      title: item.title || '',
+      image: item.image_url || null,
+      story: item.description || '',
+      color: item.meta?.color || 'primary',
+      isHeader: !!item.meta?.isHeader
+    }))
+    : fallbackStories;
+
+  const onSubmitStory = async (e) => {
+    e.preventDefault();
+    setSubmitMessage('');
+    setSubmitting(true);
+    try {
+      const payload = new FormData();
+      payload.append('full_name', form.full_name);
+      payload.append('email', form.email);
+      payload.append('title', form.title);
+      payload.append('story', form.story);
+      if (form.file) payload.append('file', form.file);
+
+      const res = await fetch(submitUrl, {
+        method: 'POST',
+        body: payload,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Submission failed');
+      setSubmitMessage(json.message || 'Story submitted successfully. Admin approval is required before publishing.');
+      setForm({ full_name: '', email: '', title: '', story: '', file: null });
+    } catch (err) {
+      setSubmitMessage(err.message || 'Submission failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <PageWrapper>
@@ -130,12 +188,56 @@ When we met them, we didn't just ask survey questions. We played games, we drew 
             Has SWAMPURNA made a difference in your life or community? We'd love 
             to hear from you and share your journey with others.
           </p>
-          <button className="cta-button">
+          <button className="cta-button" onClick={() => setShowForm(true)}>
             <span>Submit Your Story</span>
             <FiArrowRight />
           </button>
         </div>
       </CTASection>
+
+      {showForm && (
+        <StoryModal>
+          <div className="overlay" onClick={() => setShowForm(false)} />
+          <form className="modal-card" onSubmit={onSubmitStory}>
+            <h3>Share Your Story</h3>
+            <input
+              placeholder="Full name"
+              value={form.full_name}
+              onChange={(e) => setForm((s) => ({ ...s, full_name: e.target.value }))}
+              required
+            />
+            <input
+              type="email"
+              placeholder="Email (optional)"
+              value={form.email}
+              onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))}
+            />
+            <input
+              placeholder="Story title"
+              value={form.title}
+              onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))}
+              required
+            />
+            <textarea
+              rows={6}
+              placeholder="Write your story"
+              value={form.story}
+              onChange={(e) => setForm((s) => ({ ...s, story: e.target.value }))}
+              required
+            />
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setForm((s) => ({ ...s, file: e.target.files?.[0] || null }))}
+            />
+            {submitMessage && <p className="msg">{submitMessage}</p>}
+            <div className="actions">
+              <button type="button" className="secondary" onClick={() => setShowForm(false)}>Close</button>
+              <button type="submit" disabled={submitting}>{submitting ? 'Submitting...' : 'Submit'}</button>
+            </div>
+          </form>
+        </StoryModal>
+      )}
     </PageWrapper>
   );
 };
@@ -409,6 +511,54 @@ const CTASection = styled.section`
       transform: translateY(-2px);
       box-shadow: var(--shadow-xl);
     }
+  }
+`;
+
+const StoryModal = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+  }
+
+  .modal-card {
+    position: relative;
+    max-width: 640px;
+    margin: 6vh auto;
+    background: #fff;
+    border-radius: var(--radius-2xl);
+    padding: var(--space-6);
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  input,
+  textarea {
+    border: 1px solid var(--color-dark-200);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-2);
+  }
+
+  button {
+    border-radius: var(--radius-full);
+    padding: var(--space-2) var(--space-4);
+    background: var(--gradient-primary);
+    color: #fff;
+  }
+
+  .secondary {
+    background: #e5e7eb;
+    color: #111827;
   }
 `;
 

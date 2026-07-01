@@ -101,6 +101,17 @@ export const adminApi = {
   getTrackerUsers: () => request("/api/admin/period-tracker/users"),
   getTrackerUserDetails: (userId, month = "") =>
     request(`/api/admin/period-tracker/user/${encodeURIComponent(userId)}/details?month=${encodeURIComponent(month)}`),
+  getImpactStorySubmissions: ({ status = "" } = {}) =>
+    request(`/api/admin/impactstories/submissions?status=${encodeURIComponent(status)}`),
+  updateImpactStorySubmissionStatus: (id, status) =>
+    request(`/api/admin/impactstories/submissions/${id}/status`, {
+      method: "PUT",
+      body: JSON.stringify({ status }),
+    }),
+  publishImpactStorySubmission: (id) =>
+    request(`/api/admin/impactstories/submissions/${id}/publish`, {
+      method: "POST",
+    }),
   getNewsCategories: () => request("/api/admin/news-categories"),
   createNewsCategory: (payload) =>
     request("/api/admin/news-categories", {
