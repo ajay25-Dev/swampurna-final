@@ -6,6 +6,7 @@ import Footer from '../components/Footer';
 import FloatingMenu from '../components/FloatingMenu';
 import ScrollToTop from '../components/ScrollToTop';
 import FirstVisitPopup from '../components/FirstVisitPopup';
+import ChatbotWidget from '../components/ChatbotWidget';
 
 // Create lazy components for all routes outside the component
 const lazyRoutes = ROUTES.map(({ path, loader }) => ({
@@ -23,6 +24,7 @@ const AppShell = () => {
       {!isAdminRoute && <FirstVisitPopup />}
       {!isAdminRoute && <Header />}
       {!isAdminRoute && <FloatingMenu />}
+      {!isAdminRoute && <ChatbotWidget />}
       <Suspense fallback={<div>Loading...</div>}>
         <Routes>
           {lazyRoutes.map(({ path, Component }) => (

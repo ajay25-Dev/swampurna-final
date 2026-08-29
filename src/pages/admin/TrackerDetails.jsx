@@ -3,6 +3,161 @@ import styled from "styled-components";
 import AdminLayout from "./AdminLayout";
 import { adminApi } from "../../lib/adminApi";
 
+const formatDate = (value) => {
+  if (!value) return "N/A";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+};
+
+const formatBool = (value) => (value ? "Yes" : "No");
+
+const humanizeKey = (key = "") =>
+  String(key)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const formatValue = (value) => {
+  if (value === null || value === undefined || value === "") return "N/A";
+  if (typeof value === "boolean") return formatBool(value);
+  if (Array.isArray(value)) return value.length ? value.join(", ") : "None";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+};
+
+const FieldCard = ({ label, value }) => (
+  <div className="field-card">
+    <span>{label}</span>
+    <strong>{formatValue(value)}</strong>
+  </div>
+);
+
+const DataTable = ({ columns, rows, emptyText }) => (
+  <div className="table-wrap">
+    {rows.length === 0 ? (
+      <p className="empty-line">{emptyText}</p>
+    ) : (
+      <table>
+        <thead>
+          <tr>
+            {columns.map((column) => (
+              <th key={column.key}>{column.label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={row.id || `${columns[0]?.key}-${index}`}>
+              {columns.map((column) => (
+                <td key={column.key}>{column.render ? column.render(row) : formatValue(row[column.key])}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+  </div>
+);
+
+const KeyValueGrid = ({ data, exclude = [] }) => {
+  const entries = Object.entries(data || {}).filter(([key]) => !exclude.includes(key));
+  if (!entries.length) return <p className="empty-line">No details available.</p>;
+  return (
+    <div className="kv-grid">
+      {entries.map(([key, value]) => (
+        <FieldCard key={key} label={humanizeKey(key)} value={formatValue(value)} />
+      ))}
+    </div>
+  );
+};
+
+const STATUS_CLASS_NAMES = {
+  pre_period: "pre-period",
+  period: "period",
+  post_period: "post-period",
+  peak_ovulation: "peak-ovulation",
+};
+
+const statusLabel = (status, legend = []) => {
+  const match = legend.find((item) => item.key === status);
+  return match?.label || humanizeKey(status);
+};
+
+const PredictionSummary = ({ summary }) => {
+  if (!summary) return <p className="empty-line">No prediction summary available.</p>;
+
+  const data = summary.data || {};
+  const days = Array.isArray(data.days) ? data.days : [];
+  const legend = Array.isArray(summary.legend) ? summary.legend : [];
+  const adaptiveMetrics = summary.adaptive_metrics || {};
+  const fertileDays = days.filter((day) => day.statuses?.includes("peak_ovulation")).length;
+  const periodDays = days.filter((day) => day.statuses?.includes("period")).length;
+
+  return (
+    <div className="prediction-summary">
+      <div className="kv-grid important-grid">
+        <FieldCard label="Month" value={data.month} />
+        <FieldCard label="Cycle Length" value={data.cycle_length_days ? `${data.cycle_length_days} days` : "N/A"} />
+        <FieldCard label="Period Length" value={data.period_length_days ? `${data.period_length_days} days` : "N/A"} />
+        <FieldCard label="Ovulation Window" value={data.ovulation_window_days ? `${data.ovulation_window_days} days` : "N/A"} />
+        <FieldCard label="Pre Period Days" value={data.pre_period_days} />
+        <FieldCard label="Post Period Days" value={data.post_period_days} />
+        <FieldCard label="Predicted Period Days" value={periodDays} />
+        <FieldCard label="Predicted Fertile Days" value={fertileDays} />
+      </div>
+
+      <div className="summary-row">
+        <div className="summary-box">
+          <h4>Adaptive Metrics</h4>
+          <div className="mini-grid">
+            <FieldCard label="Cycle Used" value={adaptiveMetrics.cycle_length_days ? `${adaptiveMetrics.cycle_length_days} days` : "N/A"} />
+            <FieldCard label="Period Used" value={adaptiveMetrics.period_length_days ? `${adaptiveMetrics.period_length_days} days` : "N/A"} />
+            <FieldCard label="Cycle Samples" value={adaptiveMetrics.samples_used_for_cycle} />
+            <FieldCard label="Period Samples" value={adaptiveMetrics.samples_used_for_period} />
+            <FieldCard label="Source" value={adaptiveMetrics.source === "historical_logs" ? "Historical logs" : "Setup defaults"} />
+          </div>
+        </div>
+
+        <div className="summary-box">
+          <h4>Legend</h4>
+          <div className="legend-list">
+            {legend.map((item) => (
+              <span key={item.key} className={`status-chip ${STATUS_CLASS_NAMES[item.key] || "default"}`}>
+                {item.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <DataTable
+        rows={days}
+        emptyText="No prediction days available."
+        columns={[
+          { key: "date", label: "Date", render: (row) => formatDate(row.date) },
+          { key: "day", label: "Cycle Day" },
+          {
+            key: "primary_status",
+            label: "Main Prediction",
+            render: (row) => row.primary_status ? statusLabel(row.primary_status, legend) : "Normal day",
+          },
+          {
+            key: "statuses",
+            label: "All Statuses",
+            render: (row) => row.statuses?.length
+              ? row.statuses.map((item) => statusLabel(item, legend)).join(", ")
+              : "None",
+          },
+        ]}
+      />
+    </div>
+  );
+};
+
 const TrackerDetails = () => {
   const [users, setUsers] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState("");
@@ -60,6 +215,13 @@ const TrackerDetails = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUserId, month]);
 
+  const setup = details?.setup || null;
+  const summary = details?.summary || null;
+  const notificationSettings = details?.notification_settings || null;
+  const logs = details?.logs || [];
+  const symptoms = details?.symptoms || [];
+  const reminders = details?.reminders || [];
+
   return (
     <AdminLayout>
       <Wrap>
@@ -112,53 +274,104 @@ const TrackerDetails = () => {
             ) : (
               <>
                 <div className="profile">
-                  <h2>{selectedUser?.name || details.user?.email || "Customer"}</h2>
-                  <p>{details.user?.email}</p>
+                  <div>
+                    <h2>{selectedUser?.name || details.customer?.name || details.user?.email || "Customer"}</h2>
+                    <p>{details.user?.email}</p>
+                  </div>
+                  <span className={details.user?.is_active ? "active-pill" : "inactive-pill"}>
+                    {details.user?.is_active ? "Active" : "Inactive"}
+                  </span>
                 </div>
 
                 <div className="stats">
                   <div>
-                    <label>Logs</label>
-                    <strong>{details.logs?.length || 0}</strong>
+                    <label>Period Logs</label>
+                    <strong>{logs.length}</strong>
                   </div>
                   <div>
-                    <label>Symptoms</label>
-                    <strong>{details.symptoms?.length || 0}</strong>
+                    <label>Symptom Entries</label>
+                    <strong>{symptoms.length}</strong>
                   </div>
                   <div>
                     <label>Reminders</label>
-                    <strong>{details.reminders?.length || 0}</strong>
+                    <strong>{reminders.length}</strong>
                   </div>
                 </div>
 
                 <div className="section">
-                  <h3>Setup</h3>
-                  <pre>{JSON.stringify(details.setup || {}, null, 2)}</pre>
+                  <h3>Cycle Setup</h3>
+                  {setup ? (
+                    <div className="kv-grid important-grid">
+                      <FieldCard label="Last Period Start" value={formatDate(setup.last_period_start_date)} />
+                      <FieldCard label="Period End" value={formatDate(setup.period_end_date)} />
+                      <FieldCard label="Cycle Length" value={`${setup.cycle_length_days || "N/A"} days`} />
+                      <FieldCard label="Period Length" value={`${setup.period_length_days || "N/A"} days`} />
+                      <FieldCard label="Pre Period Days" value={setup.pre_period_days} />
+                      <FieldCard label="Post Period Days" value={setup.post_period_days} />
+                      <FieldCard label="Ovulation Start Day" value={setup.ovulation_start_day} />
+                      <FieldCard label="Ovulation Window" value={`${setup.ovulation_window_days || "N/A"} days`} />
+                      <FieldCard label="Selected Dates" value={setup.selected_dates?.map(formatDate)} />
+                      <FieldCard label="Has No Idea" value={setup.has_no_idea} />
+                      <FieldCard label="Notes" value={setup.notes} />
+                      <FieldCard label="Last Updated" value={formatDate(setup.updated_at)} />
+                    </div>
+                  ) : (
+                    <p className="empty-line">No setup saved.</p>
+                  )}
                 </div>
 
                 <div className="section">
-                  <h3>Summary</h3>
-                  <pre>{JSON.stringify(details.summary || {}, null, 2)}</pre>
+                  <h3>Prediction Summary</h3>
+                  <PredictionSummary summary={summary} />
                 </div>
 
                 <div className="section">
                   <h3>Notification Settings</h3>
-                  <pre>{JSON.stringify(details.notification_settings || {}, null, 2)}</pre>
+                  <KeyValueGrid data={notificationSettings} exclude={["id", "user_id"]} />
                 </div>
 
                 <div className="section">
-                  <h3>Recent Logs</h3>
-                  <pre>{JSON.stringify((details.logs || []).slice(0, 20), null, 2)}</pre>
+                  <h3>Recent Period Logs</h3>
+                  <DataTable
+                    rows={logs.slice(0, 20)}
+                    emptyText="No period logs found."
+                    columns={[
+                      { key: "period_start_date", label: "Start", render: (row) => formatDate(row.period_start_date) },
+                      { key: "period_end_date", label: "End", render: (row) => formatDate(row.period_end_date) },
+                      { key: "flow", label: "Flow" },
+                      { key: "notes", label: "Notes" },
+                      { key: "created_at", label: "Created", render: (row) => formatDate(row.created_at) },
+                    ]}
+                  />
                 </div>
 
                 <div className="section">
                   <h3>Recent Symptoms</h3>
-                  <pre>{JSON.stringify((details.symptoms || []).slice(0, 20), null, 2)}</pre>
+                  <DataTable
+                    rows={symptoms.slice(0, 20)}
+                    emptyText="No symptom entries found."
+                    columns={[
+                      { key: "track_date", label: "Date", render: (row) => formatDate(row.track_date) },
+                      { key: "mood", label: "Mood" },
+                      { key: "pain_level", label: "Pain" },
+                      { key: "symptoms", label: "Symptoms" },
+                      { key: "notes", label: "Notes" },
+                    ]}
+                  />
                 </div>
 
                 <div className="section">
                   <h3>Reminders</h3>
-                  <pre>{JSON.stringify(details.reminders || [], null, 2)}</pre>
+                  <DataTable
+                    rows={reminders}
+                    emptyText="No reminders set."
+                    columns={[
+                      { key: "reminder_type", label: "Type" },
+                      { key: "reminder_time", label: "Time" },
+                      { key: "is_enabled", label: "Enabled", render: (row) => formatBool(row.is_enabled) },
+                      { key: "created_at", label: "Created", render: (row) => formatDate(row.created_at) },
+                    ]}
+                  />
                 </div>
 
                 {Array.isArray(details.warnings) && details.warnings.length > 0 && (
@@ -225,14 +438,14 @@ const Wrap = styled.div`
   .grid {
     display: grid;
     grid-template-columns: 360px 1fr;
-    gap: var(--space-5);
+    gap: var(--space-2);
   }
 
   .card {
     background: #fff;
     border: 1px solid var(--color-dark-100);
     border-radius: var(--radius-2xl);
-    padding: var(--space-5);
+    padding: var(--space-2) var(--space-3);
     box-shadow: var(--shadow-soft);
   }
 
@@ -246,7 +459,7 @@ const Wrap = styled.div`
 
   .user-item {
     text-align: left;
-    padding: var(--space-3);
+    padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-lg);
     border: 1px solid var(--color-dark-100);
     background: #f9fafb;
@@ -271,8 +484,15 @@ const Wrap = styled.div`
 
   .detail {
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-2);
     align-content: start;
+  }
+
+  .profile {
+    align-items: flex-start;
+    display: flex;
+    gap: var(--space-2);
+    justify-content: space-between;
   }
 
   .profile h2 {
@@ -284,28 +504,55 @@ const Wrap = styled.div`
     color: var(--color-dark-500);
   }
 
+  .active-pill,
+  .inactive-pill {
+    border-radius: var(--radius-full);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    padding: 6px 10px;
+  }
+
+  .active-pill {
+    background: #ecfdf5;
+    color: #166534;
+  }
+
+  .inactive-pill {
+    background: #fef2f2;
+    color: #991b1b;
+  }
+
   .stats {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
 
-  .stats > div {
+  .stats > div,
+  .field-card {
     border: 1px solid var(--color-dark-100);
     border-radius: var(--radius-lg);
-    padding: var(--space-3);
+    padding: var(--space-2) var(--space-3);
     background: #f9fafb;
     display: grid;
     gap: var(--space-1);
   }
 
-  .stats label {
+  .stats label,
+  .field-card span {
     color: var(--color-dark-500);
     font-size: var(--text-sm);
   }
 
   .stats strong {
     font-size: var(--text-xl);
+  }
+
+  .field-card strong {
+    color: var(--color-dark-800);
+    font-size: var(--text-sm);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
   }
 
   .section {
@@ -315,26 +562,114 @@ const Wrap = styled.div`
 
   .section h3 {
     font-size: var(--text-lg);
+    margin: 0;
   }
 
-  pre {
-    margin: 0;
-    padding: var(--space-3);
-    border-radius: var(--radius-lg);
+  .kv-grid {
+    display: grid;
+    gap: var(--space-2);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .important-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .prediction-summary {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .summary-row {
+    display: grid;
+    gap: var(--space-2);
+    grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
+  }
+
+  .summary-box {
+    background: #fff;
     border: 1px solid var(--color-dark-100);
-    background: #0f172a;
-    color: #e2e8f0;
-    max-height: 260px;
+    border-radius: var(--radius-lg);
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .summary-box h4 {
+    color: var(--color-dark-800);
+    font-size: var(--text-base);
+    margin: 0;
+  }
+
+  .mini-grid {
+    display: grid;
+    gap: var(--space-2);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .legend-list {
+    align-content: start;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .status-chip {
+    border-radius: var(--radius-full);
+    display: inline-flex;
+    font-size: var(--text-sm);
+    font-weight: 700;
+    padding: 7px 10px;
+  }
+
+  .status-chip.pre-period { background: #fef3c7; color: #92400e; }
+  .status-chip.period { background: #fee2e2; color: #991b1b; }
+  .status-chip.post-period { background: #dcfce7; color: #166534; }
+  .status-chip.peak-ovulation { background: #dbeafe; color: #1d4ed8; }
+  .status-chip.default { background: #e2e8f0; color: #334155; }
+  .table-wrap {
+    border: 1px solid var(--color-dark-100);
+    border-radius: var(--radius-lg);
     overflow: auto;
-    font-size: 12px;
-    line-height: 1.5;
+  }
+
+  table {
+    border-collapse: collapse;
+    min-width: 760px;
+    width: 100%;
+  }
+
+  th,
+  td {
+    border-bottom: 1px solid var(--color-dark-100);
+    color: var(--color-dark-700);
+    font-size: var(--text-sm);
+    padding: 7px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    background: #f8fafc;
+    color: var(--color-dark-500);
+    font-weight: 700;
+  }
+
+  tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .empty-line {
+    color: var(--color-dark-500);
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
   }
 
   .warnings {
     border: 1px solid #fbbf24;
     border-radius: var(--radius-lg);
     background: #fffbeb;
-    padding: var(--space-3);
+    padding: var(--space-2) var(--space-3);
     display: grid;
     gap: var(--space-2);
   }
@@ -344,6 +679,13 @@ const Wrap = styled.div`
     color: #92400e;
   }
 
+  @media (max-width: 1200px) {
+    .important-grid,
+    .kv-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
   @media (max-width: 1024px) {
     .grid {
       grid-template-columns: 1fr;
@@ -351,7 +693,11 @@ const Wrap = styled.div`
     .list {
       max-height: none;
     }
-    .stats {
+    .stats,
+    .important-grid,
+    .kv-grid,
+    .summary-row,
+    .mini-grid {
       grid-template-columns: 1fr;
     }
   }

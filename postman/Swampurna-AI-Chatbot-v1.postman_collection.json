@@ -1,0 +1,281 @@
+{
+  "info": {
+    "_postman_id": "eb21a9e3-a7ca-41cf-9a0d-7c9ea72c2d11",
+    "name": "Swampurna AI Chatbot v1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Import-ready collection for the shared website and mobile chatbot API. The API key stays on the server; mobile clients must never send it."
+  },
+  "item": [
+    {
+      "name": "1. Health check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "health"
+          ]
+        },
+        "description": "Optional connectivity check before testing the chatbot."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('API is healthy', function () { pm.expect(pm.response.json().ok).to.eql(true); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Ask AI - guest user",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"What is menstruation?\",\n  \"consent\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/chat/answer",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "chat",
+            "answer"
+          ]
+        },
+        "description": "Use after the user explicitly agrees to AI processing. Authentication is optional. No OpenAI/API key belongs in this request."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "const json = pm.response.json();",
+              "pm.test('Returns an answer', function () { pm.expect(json.answer).to.be.a('string').and.not.empty; });",
+              "pm.test('Returns source links', function () { pm.expect(json.sources).to.be.an('array').and.not.empty; });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Ask AI - authenticated user (optional)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text",
+            "disabled": true
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"How often should sanitary pads be changed?\",\n  \"consent\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/chat/answer",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "chat",
+            "answer"
+          ]
+        },
+        "description": "Enable Authorization only if the app already has a valid Swampurna JWT. Guests are supported too."
+      },
+      "response": []
+    },
+    {
+      "name": "4. Validation - consent required",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"What is menstruation?\",\n  \"consent\": false\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/chat/answer",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "chat",
+            "answer"
+          ]
+        },
+        "description": "Expected HTTP 400. Present a clear consent action in the app before calling the AI."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 400', function () { pm.response.to.have.status(400); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Validation - question required",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"\",\n  \"consent\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/chat/answer",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "chat",
+            "answer"
+          ]
+        },
+        "description": "Expected HTTP 400. The app should prevent blank messages before making a request."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 400', function () { pm.response.to.have.status(400); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Unsupported question - safe fallback",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"Write JavaScript code for a calculator.\",\n  \"consent\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/chat/answer",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "chat",
+            "answer"
+          ]
+        },
+        "description": "The assistant should not answer topics outside approved Swampurna website content, and instead returns a Contact Swampurna fallback."
+      },
+      "response": []
+    },
+    {
+      "name": "7. Urgent health concern - safe response",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"I have very heavy bleeding and severe pain. What should I do?\",\n  \"consent\": true\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/chat/answer",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "chat",
+            "answer"
+          ]
+        },
+        "description": "The assistant must not diagnose. It returns urgent-care guidance directing the user to a qualified professional or local emergency services."
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

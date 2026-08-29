@@ -11,6 +11,8 @@ const Impactstories = () => {
   const [showForm, setShowForm] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [submitMessage, setSubmitMessage] = React.useState('');
+  const [submitStatus, setSubmitStatus] = React.useState('');
+  const fileInputRef = React.useRef(null);
   const [form, setForm] = React.useState({
     full_name: '',
     email: '',
@@ -21,6 +23,18 @@ const Impactstories = () => {
 
   const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
   const submitUrl = API_BASE_URL ? `${API_BASE_URL}/api/v1/impactstories/submit` : '/api/v1/impactstories/submit';
+
+  const resetStoryForm = () => {
+    setForm({ full_name: '', email: '', title: '', story: '', file: null });
+    setSubmitMessage('');
+    setSubmitStatus('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const closeStoryForm = () => {
+    setShowForm(false);
+    resetStoryForm();
+  };
 
   const fallbackStories = [
     {
@@ -100,6 +114,7 @@ When we met them, we didn't just ask survey questions. We played games, we drew 
   const onSubmitStory = async (e) => {
     e.preventDefault();
     setSubmitMessage('');
+    setSubmitStatus('');
     setSubmitting(true);
     try {
       const payload = new FormData();
@@ -116,9 +131,12 @@ When we met them, we didn't just ask survey questions. We played games, we drew 
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || 'Submission failed');
       setSubmitMessage(json.message || 'Story submitted successfully. Admin approval is required before publishing.');
+      setSubmitStatus('success');
       setForm({ full_name: '', email: '', title: '', story: '', file: null });
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
       setSubmitMessage(err.message || 'Submission failed');
+      setSubmitStatus('error');
     } finally {
       setSubmitting(false);
     }
@@ -197,7 +215,7 @@ When we met them, we didn't just ask survey questions. We played games, we drew 
 
       {showForm && (
         <StoryModal>
-          <div className="overlay" onClick={() => setShowForm(false)} />
+          <div className="overlay" onClick={closeStoryForm} />
           <form className="modal-card" onSubmit={onSubmitStory}>
             <h3>Share Your Story</h3>
             <input
@@ -228,11 +246,12 @@ When we met them, we didn't just ask survey questions. We played games, we drew 
             <input
               type="file"
               accept="image/*"
+              ref={fileInputRef}
               onChange={(e) => setForm((s) => ({ ...s, file: e.target.files?.[0] || null }))}
             />
-            {submitMessage && <p className="msg">{submitMessage}</p>}
+            {submitMessage && <p className={`msg ${submitStatus}`}>{submitMessage}</p>}
             <div className="actions">
-              <button type="button" className="secondary" onClick={() => setShowForm(false)}>Close</button>
+              <button type="button" className="secondary" onClick={closeStoryForm}>Close</button>
               <button type="submit" disabled={submitting}>{submitting ? 'Submitting...' : 'Submit'}</button>
             </div>
           </form>
@@ -549,11 +568,36 @@ const StoryModal = styled.div`
     gap: var(--space-2);
   }
 
+  .msg {
+    border-radius: var(--radius-lg);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .msg.success {
+    background: #ecfdf5;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+  }
+
+  .msg.error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+  }
+
   button {
     border-radius: var(--radius-full);
     padding: var(--space-2) var(--space-4);
     background: var(--gradient-primary);
     color: #fff;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
   }
 
   .secondary {

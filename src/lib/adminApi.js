@@ -112,6 +112,10 @@ export const adminApi = {
     request(`/api/admin/impactstories/submissions/${id}/publish`, {
       method: "POST",
     }),
+  deleteImpactStorySubmission: (id) =>
+    request(`/api/admin/impactstories/submissions/${id}`, {
+      method: "DELETE",
+    }),
   getNewsCategories: () => request("/api/admin/news-categories"),
   createNewsCategory: (payload) =>
     request("/api/admin/news-categories", {

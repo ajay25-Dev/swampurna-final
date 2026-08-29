@@ -328,6 +328,27 @@ const Wrap = styled.div`
     flex: 1 1 auto;
   }
 
+  /* Admin-wide compact type scale keeps content pages readable and dense. */
+  main h1 {
+    font-size: 25px !important;
+    line-height: 1.25 !important;
+  }
+
+  main h2 {
+    font-size: 18px !important;
+    line-height: 1.3 !important;
+  }
+
+  main h3 {
+    font-size: 16px !important;
+    line-height: 1.35 !important;
+  }
+
+  main h4 {
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+  }
+
   @media (min-width: 769px) {
     aside {
       position: relative;
