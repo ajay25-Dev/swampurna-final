@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
-import { FiMail, FiAward, FiUsers, FiHeart } from 'react-icons/fi';
+import { FiMail, FiAward, FiUsers, FiHeart, FiX } from 'react-icons/fi';
+import { useContentItems } from '../hooks/useContentItems';
 import Member1 from '../assets/images/images1/Member1.jpg';
 import Member2 from '../assets/images/images1/Member2.jpg';
 import Member3 from '../assets/images/images1/Member3.jpg';
@@ -8,69 +9,72 @@ import Member4 from '../assets/images/images1/Member4.jpg';
 import Member5 from '../assets/images/images1/Member5.jpg';
 import Member6 from '../assets/images/images1/Member6.jpg';
 
+const fallbackTeamMembers = [
+  {
+    image_url: Member1,
+    title: 'Dr. Suparna Dutta',
+    subtitle: 'Principal Investigator',
+    tag: 'primary',
+    meta: { qualification: 'Ph.D.', designation: 'Associate Professor, Humanities (Communication)', email: 's.dutta@bitmesra.ac.in' },
+    description: 'P.I. (Project Investigator): Dr. Suparna Dutta is an Associate professor (Humanities) in the Department of Management at BIT Mesra Noida Campus, India. She teaches various aspects of the "Communication" subject to students of UG/PG and has guided research scholars and students in their research studies. She has organized various international and national conferences. Her papers have been published in national and international journals, proceedings and books etc. She has authored a book "Business Communication" published by PHI publisher & her edited volume on Communication was published by MacMillan India. She is eager to help students with career development, personality development and social challenges. Her area of Interest are Development & Gender studies, Participatory & Social Behavior Change, Communication for social Outreach, and Animation & Cognitive Science communication tools and technologies.',
+    sort_order: 0,
+  },
+  {
+    image_url: Member2,
+    title: 'Dr. K Aparna Sharma',
+    subtitle: 'Co-Principal Investigator',
+    tag: 'secondary',
+    meta: { qualification: 'Ph.D.', designation: 'Professor Department of Obstetrics and Gynaecology AIIMS New Delhi', email: '' },
+    description: 'Co-Principal Investigator: Dr. K Aparna Sharma is a Professor in the Department of Obstetrics and Gynaecology at AIIMS New Delhi, bringing extensive medical expertise to the SWAMPURNA project.',
+    sort_order: 1,
+  },
+  {
+    image_url: Member3,
+    title: 'Vibhu Acharya',
+    subtitle: 'Senior Research Fellow',
+    tag: 'accent',
+    meta: { qualification: "Integrated master's degree (Birla Institute of Technology, Mesra) and Master's in Sociology", designation: 'Senior Research Fellow', email: 'v.acharya3204@gmail.com' },
+    description: "Senior Research Fellow: Vibhu's research interest lies at the critical intersection of science, technology, innovation (STI) policy, society, and development, making them instrumental in designing a solution that is both technologically advanced and culturally sensitive. Vibhu is uniquely positioned to bridge the gap between hard science and social context. Their experience is reinforced by a proficiency in Quantitative & Qualitative tools like STATA, NVivo, ensuring our research is rigorously supported by data analysis.",
+    sort_order: 2,
+  },
+  {
+    image_url: Member4,
+    title: 'Puja Gupta',
+    subtitle: 'Junior Research Fellow',
+    tag: 'primary',
+    meta: { qualification: 'Masters in political science, Delhi university', designation: 'Junior Research Fellow', email: 'pujagupta.gupta88@gmail.com' },
+    description: 'Junior Research Fellow: The Junior Research Fellow supports research activities on menstrual health and hygiene. She conducts field surveys, interviews, and focuses group discussions, and ensures accurate and ethical data collection. She reviews literature and helps analyse qualitative and quantitative data. She prepares short reports, research notes, and documentation for project meetings. She coordinates with field teams, schools, community groups, and partner organisations to ensure smooth implementation.',
+    sort_order: 3,
+  },
+  {
+    image_url: Member5,
+    title: 'Annu Kumari',
+    subtitle: 'Project Assistant',
+    tag: 'secondary',
+    meta: { qualification: 'Bachelors in physical and computer science, Delhi University', designation: 'Project Assistant', email: 'annunandan2003@gmail.com' },
+    description: "Project Assistant: She supports field implementation, awareness activities, and community engagement focused on menstrual hygiene and women's health. Mobilises adolescent girls and women's groups and coordinates the distribution of menstrual hygiene products. She collects field data, maintains records, assists in monitoring activities, and prepares brief reports.",
+    sort_order: 4,
+  },
+  {
+    image_url: Member6,
+    title: 'Sandeep Gorai',
+    subtitle: 'Data Entry Operator',
+    tag: 'accent',
+    meta: { qualification: 'Masters in computer science', designation: 'Data entry operator', email: 'maxjmabitmca@gmail.com' },
+    description: "Data entry operator: He manages all data related tasks for the menstrual health project, ensuring accurate, timely, and confidential entry of beneficiary records, session details, distribution logs, and monitoring data. He maintains digital databases, verifies information, and supports reporting needs. In addition to data entry, he oversees the project's website and app development. He updates menstrual health content, uploads reports and photos, manages dashboards, and ensures the platform functions smoothly.",
+    sort_order: 5,
+  },
+];
+
 const Ourteam = () => {
-  const teamMembers = [
-    {
-      profileImage: Member1,
-      name: 'Dr. Suparna Dutta',
-      qualification: 'Ph.D.',
-      designation: 'Associate Professor, Humanities (Communication)',
-      email: 's.dutta@bitmesra.ac.in',
-      role: 'Principal Investigator',
-      color: 'primary',
-      description: 'P.I. (Project Investigator): Dr. Suparna Dutta is an Associate professor (Humanities) in the Department of Management at BIT Mesra Noida Campus, India. She teaches various aspects of the "Communication" subject to students of UG/PG and has guided research scholars and students in their research studies. She has organized various international and national conferences. Her papers have been published in national and international journals, proceedings and books etc. She has authored a book "Business Communication" published by PHI publisher & her edited volume on Communication was published by MacMillan India. She is eager to help students with career development, personality development and social challenges. Her area of Interest are Development & Gender studies, Participatory & Social Behavior Change, Communication for social Outreach, and Animation & Cognitive Science communication tools and technologies.'
-    },
-    {
-      profileImage: Member2,
-      name: 'Dr. K Aparna Sharma',
-      qualification: 'Ph.D.',
-      designation: 'Professor Department of Obstetrics and Gynaecology AIIMS New Delhi',
-      email: '',
-      role: 'Co-Principal Investigator',
-      color: 'secondary',
-      description: 'Co-Principal Investigator: Dr. K Aparna Sharma is a Professor in the Department of Obstetrics and Gynaecology at AIIMS New Delhi, bringing extensive medical expertise to the SWAMPURNA project.'
-    },
-    {
-      profileImage: Member3,
-      name: 'Vibhu Acharya',
-      qualification: 'Integrated master\'s degree (Birla Institute of Technology, Mesra) and Master\'s in Sociology',
-      designation: 'Senior Research Fellow',
-      email: 'v.acharya3204@gmail.com',
-      role: 'Senior Research Fellow',
-      color: 'accent',
-      description: 'Senior Research Fellow: Vibhu\'s research interest lies at the critical intersection of science, technology, innovation (STI) policy, society, and development, making them instrumental in designing a solution that is both technologically advanced and culturally sensitive. Vibhu is uniquely positioned to bridge the gap between hard science and social context. Their experience is reinforced by a proficiency in Quantitative & Qualitative tools like STATA, NVivo, ensuring our research is rigorously supported by data analysis.'
-    },
-    {
-      profileImage: Member4,
-      name: 'Puja Gupta',
-      qualification: 'Masters in political science, Delhi university',
-      designation: 'Junior Research Fellow',
-      email: 'pujagupta.gupta88@gmail.com',
-      role: 'Junior Research Fellow',
-      color: 'primary',
-      description: 'Junior Research Fellow: The Junior Research Fellow supports research activities on menstrual health and hygiene. She conducts field surveys, interviews, and focuses group discussions, and ensures accurate and ethical data collection. She reviews literature and helps analyse qualitative and quantitative data. She prepares short reports, research notes, and documentation for project meetings. She coordinates with field teams, schools, community groups, and partner organisations to ensure smooth implementation.'
-    },
-    {
-      profileImage: Member5,
-      name: 'Annu Kumari',
-      qualification: 'Bachelors in physical and computer science, Delhi University',
-      designation: 'Project Assistant',
-      email: 'annunandan2003@gmail.com',
-      role: 'Project Assistant',
-      color: 'secondary',
-      description: 'Project Assistant: She supports field implementation, awareness activities, and community engagement focused on menstrual hygiene and women\'s health. Mobilises adolescent girls and women\'s groups and coordinates the distribution of menstrual hygiene products. She collects field data, maintains records, assists in monitoring activities, and prepares brief reports.'
-    },
-    {
-      profileImage: Member6,
-      name: 'Sandeep Gorai',
-      qualification: 'Masters in computer science',
-      designation: 'Data entry operator',
-      email: 'maxjmabitmca@gmail.com',
-      role: 'Data Entry Operator',
-      color: 'accent',
-      description: 'Data entry operator: He manages all data related tasks for the menstrual health project, ensuring accurate, timely, and confidential entry of beneficiary records, session details, distribution logs, and monitoring data. He maintains digital databases, verifies information, and supports reporting needs. In addition to data entry, he oversees the project\'s website and app development. He updates menstrual health content, uploads reports and photos, manages dashboards, and ensures the platform functions smoothly.'
-    },
-  ];
+  const { items } = useContentItems({
+    page: 'Ourteam',
+    section: 'team_members',
+    fallback: fallbackTeamMembers,
+  });
+
+  const teamMembers = [...(items || [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const [selectedMember, setSelectedMember] = useState(null);
 
   const values = [
     { icon: FiUsers, title: 'Collaboration', description: 'We work together across disciplines to find the best solutions for menstrual health challenges.' },
@@ -109,26 +113,22 @@ const Ourteam = () => {
 
       <TeamGrid>
         {teamMembers.map((member, index) => (
-          <TeamCard key={index} className={`color-${member.color}`}>
+          <TeamCard
+            key={member.id || index}
+            className={`color-${member.tag || 'primary'}`}
+            onClick={() => setSelectedMember(member)}
+          >
             <div className="card-header">
               <div className="image-wrapper">
-                <img src={member.profileImage} alt={member.name} />
-                <div className="role-badge">{member.role}</div>
+                <img src={member.image_url} alt={member.title} />
+                <div className="role-badge">{member.subtitle}</div>
               </div>
             </div>
             <div className="card-content">
-              <h3>{member.name}</h3>
-              <span className="qualification">{member.qualification}</span>
-              <p className="designation">{member.designation}</p>
-              {member.email && (
-                <a href={`mailto:${member.email}`} className="email-link">
-                  <FiMail />
-                  <span>{member.email}</span>
-                </a>
-              )}
-              {member.description && (
-                <p className="member-description">{member.description}</p>
-              )}
+              <h3>{member.title}</h3>
+              <span className="qualification">{member.meta?.qualification}</span>
+              <p className="designation">{member.meta?.designation}</p>
+              <button type="button" className="view-profile-btn">View Profile</button>
             </div>
           </TeamCard>
         ))}
@@ -165,6 +165,40 @@ const Ourteam = () => {
           <cite>– Dr. Suparna Dutta, Principal Investigator</cite>
         </div>
       </QuoteSection>
+
+      {selectedMember && (
+        <ModalOverlay onClick={() => setSelectedMember(null)}>
+          <ModalCard className={`color-${selectedMember.tag || 'primary'}`} onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="modal-close" onClick={() => setSelectedMember(null)} aria-label="Close">
+              <FiX />
+            </button>
+            <div className="modal-header">
+              <div className="modal-image">
+                <img src={selectedMember.image_url} alt={selectedMember.title} />
+              </div>
+              <div className="modal-heading">
+                <div className="modal-role-badge">{selectedMember.subtitle}</div>
+                <h3>{selectedMember.title}</h3>
+                {selectedMember.meta?.qualification && (
+                  <span className="modal-qualification">{selectedMember.meta.qualification}</span>
+                )}
+                {selectedMember.meta?.designation && (
+                  <p className="modal-designation">{selectedMember.meta.designation}</p>
+                )}
+                {selectedMember.meta?.email && (
+                  <a href={`mailto:${selectedMember.meta.email}`} className="modal-email">
+                    <FiMail />
+                    <span>{selectedMember.meta.email}</span>
+                  </a>
+                )}
+              </div>
+            </div>
+            {selectedMember.description && (
+              <p className="modal-description">{selectedMember.description}</p>
+            )}
+          </ModalCard>
+        </ModalOverlay>
+      )}
     </PageWrapper>
   );
 };
@@ -311,6 +345,7 @@ const TeamCard = styled.div`
   display: flex;
   flex-direction: column;
   height: 100%;
+  cursor: pointer;
 
   &:hover {
     transform: translateY(-6px);
@@ -395,28 +430,172 @@ const TeamCard = styled.div`
     margin-bottom: var(--space-4);
   }
 
-  .email-link {
+  .view-profile-btn {
+    margin-top: auto;
+    align-self: flex-start;
+    padding: var(--space-2) var(--space-5);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-primary-600);
+    background: var(--color-primary-50);
+    border: 1px solid var(--color-primary-100);
+    border-radius: var(--radius-full);
+    transition: all var(--transition-base);
+  }
+
+  &:hover .view-profile-btn {
+    background: var(--gradient-primary);
+    color: white;
+    border-color: transparent;
+  }
+`;
+
+const ModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.55);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  z-index: 1000;
+`;
+
+const ModalCard = styled.div`
+  position: relative;
+  background: white;
+  border-radius: var(--radius-3xl);
+  padding: var(--space-8);
+  max-width: 640px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-soft-lg);
+
+  .modal-close {
+    position: absolute;
+    top: var(--space-4);
+    right: var(--space-4);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--color-dark-50);
+    color: var(--color-dark-600);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    transition: all var(--transition-base);
+
+    &:hover {
+      background: var(--color-dark-100);
+      color: var(--color-dark-900);
+    }
+  }
+
+  .modal-header {
+    display: flex;
+    gap: var(--space-6);
+    margin-bottom: var(--space-6);
+  }
+
+  .modal-image {
+    width: 120px;
+    height: 120px;
+    border-radius: var(--radius-2xl);
+    overflow: hidden;
+    flex-shrink: 0;
+    background: var(--color-dark-50);
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  .modal-heading {
+    flex: 1;
+    padding-right: var(--space-8);
+  }
+
+  .modal-role-badge {
+    display: inline-block;
+    padding: var(--space-1-5) var(--space-4);
+    color: white;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    border-radius: var(--radius-full);
+    margin-bottom: var(--space-2);
+  }
+
+  &.color-primary .modal-role-badge {
+    background: var(--gradient-primary);
+  }
+
+  &.color-secondary .modal-role-badge {
+    background: var(--gradient-secondary);
+  }
+
+  &.color-accent .modal-role-badge {
+    background: var(--gradient-accent);
+    color: var(--color-dark-900);
+  }
+
+  h3 {
+    font-family: var(--font-heading);
+    font-size: var(--text-2xl);
+    font-weight: 600;
+    color: var(--color-dark-900);
+    margin-bottom: var(--space-1);
+  }
+
+  .modal-qualification {
+    display: block;
+    font-size: var(--text-sm);
+    color: var(--color-primary-600);
+    font-weight: 500;
+    margin-bottom: var(--space-2);
+  }
+
+  .modal-designation {
+    font-size: var(--text-sm);
+    color: var(--color-dark-500);
+    line-height: 1.6;
+    margin-bottom: var(--space-2);
+  }
+
+  .modal-email {
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
     font-size: var(--text-sm);
     color: var(--color-secondary-600);
     font-weight: 500;
-    transition: color var(--transition-base);
-    margin-bottom: var(--space-4);
 
     &:hover {
       color: var(--color-secondary-700);
     }
   }
 
-  .member-description {
-    font-size: var(--text-sm);
+  .modal-description {
+    font-size: var(--text-base);
     color: var(--color-dark-600);
-    line-height: 1.7;
-    margin-top: var(--space-4);
-    text-align: justify;
-    flex: 1;
+    line-height: 1.8;
+    white-space: pre-line;
+  }
+
+  @media (max-width: 640px) {
+    padding: var(--space-6);
+
+    .modal-header {
+      flex-direction: column;
+    }
+
+    .modal-heading {
+      padding-right: 0;
+    }
   }
 `;
 

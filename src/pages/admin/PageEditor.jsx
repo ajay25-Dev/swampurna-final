@@ -70,8 +70,12 @@ const PageEditor = () => {
   const isFaqs = slug === "Faqs";
   const isCompetitionEvent = slug === "Compitionevent";
   const isMythsTaboos = slug === "Mythstaboos";
+  const isMenstrualProducts = slug === "Menstrualproducts";
+  const isGovernmentInitiatives = slug === "Governmentinitiatives";
+  const isOurTeam = slug === "Ourteam";
+  const isOurApproach = slug === "Ourapproach";
   const isMediaGallery = isPhotoGallery || isVideoGallery;
-  const isSpecialEditor = isMediaGallery || isImpactStory || isImpactStories || isNewsArticles || isFaqs || isCompetitionEvent || isMythsTaboos;
+  const isSpecialEditor = isMediaGallery || isImpactStory || isImpactStories || isNewsArticles || isFaqs || isCompetitionEvent || isMythsTaboos || isMenstrualProducts || isGovernmentInitiatives || isOurTeam || isOurApproach;
   const [page, setPage] = useState({ title: "", hero_title: "", hero_subtitle: "", hero_image_url: "" });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -178,6 +182,34 @@ const PageEditor = () => {
     loadItems("myths_items");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMythsTaboos, slug]);
+
+  useEffect(() => {
+    if (!isMenstrualProducts) return;
+    setSectionKey("menstrual_products");
+    loadItems("menstrual_products");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMenstrualProducts, slug]);
+
+  useEffect(() => {
+    if (!isGovernmentInitiatives) return;
+    setSectionKey("government_timeline");
+    loadItems("government_timeline");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGovernmentInitiatives, slug]);
+
+  useEffect(() => {
+    if (!isOurTeam) return;
+    setSectionKey("team_members");
+    loadItems("team_members");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOurTeam, slug]);
+
+  useEffect(() => {
+    if (!isOurApproach) return;
+    setSectionKey("approach_items");
+    loadItems("approach_items");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOurApproach, slug]);
 
   const save = async () => {
     setSaving(true);
@@ -298,18 +330,26 @@ const PageEditor = () => {
               ? "competition_events"
             : isMythsTaboos
               ? "myths_items"
+            : isMenstrualProducts
+              ? "menstrual_products"
+            : isGovernmentInitiatives
+              ? "government_timeline"
+            : isOurTeam
+              ? "team_members"
+            : isOurApproach
+              ? "approach_items"
             : sectionKey;
       const res = await adminApi.createItem({
         page_slug: slug,
         section_key: finalSectionKey,
-        title: isPhotoGallery ? "" : isVideoGallery ? "New Video" : isImpactStory ? "New Article" : isImpactStories ? "New Story" : isNewsArticles ? "New Article" : isFaqs ? "New question?" : isCompetitionEvent ? "New Event" : isMythsTaboos ? "New myth heading" : "New Item",
-        image_url: isPhotoGallery ? uploadUrl : isVideoGallery ? "" : (isImpactStory || isImpactStories || isNewsArticles || isCompetitionEvent) ? "" : undefined,
-        description: isFaqs ? "New answer..." : undefined,
-        tag: isFaqs ? "active" : isMythsTaboos ? "active" : undefined,
-        meta: isImpactStories ? { color: "primary", isHeader: false } : isCompetitionEvent ? { location: "", buttonText: "Register Now", color: "primary" } : undefined,
+        title: isPhotoGallery ? "" : isVideoGallery ? "New Video" : isImpactStory ? "New Article" : isImpactStories ? "New Story" : isNewsArticles ? "New Article" : isFaqs ? "New question?" : isCompetitionEvent ? "New Event" : isMythsTaboos ? "New myth heading" : isMenstrualProducts ? "New Product" : isGovernmentInitiatives ? "New milestone title" : isOurTeam ? "New Team Member" : isOurApproach ? "New Approach Title" : "New Item",
+        image_url: isPhotoGallery ? uploadUrl : isVideoGallery ? "" : (isImpactStory || isImpactStories || isNewsArticles || isCompetitionEvent || isMenstrualProducts || isOurTeam || isOurApproach) ? "" : undefined,
+        description: isFaqs ? "New answer..." : isMenstrualProducts ? "" : isGovernmentInitiatives ? "" : isOurTeam ? "" : isOurApproach ? "" : undefined,
+        tag: isFaqs ? "active" : isMythsTaboos ? "active" : isMenstrualProducts ? "primary" : isOurTeam ? "primary" : isOurApproach ? "primary" : undefined,
+        meta: isImpactStories ? { color: "primary", isHeader: false } : isCompetitionEvent ? { location: "", buttonText: "Register Now", color: "primary" } : isGovernmentInitiatives ? { government: "", status: "", beneficiaries: "" } : isOurTeam ? { qualification: "", email: "" } : isOurApproach ? { icon: "smartphone" } : undefined,
         category_id: isNewsArticles ? (newsCategories[0]?.id || null) : undefined,
         category: isNewsArticles ? (newsCategories[0]?.name || "News") : undefined,
-        subtitle: isCompetitionEvent ? "Event Date" : undefined,
+        subtitle: isCompetitionEvent ? "Event Date" : isGovernmentInitiatives ? "2026" : isOurTeam ? "Team Member" : undefined,
         link_url: isCompetitionEvent ? "" : undefined,
         sort_order: items.length,
       });
@@ -433,6 +473,14 @@ const PageEditor = () => {
                           ? "Manage competition events and event details."
                           : isMythsTaboos
                             ? "Manage myths/taboos heading, description and status."
+                            : isMenstrualProducts
+                              ? "Add each menstrual product with its name, image, description and color."
+                              : isGovernmentInitiatives
+                                ? "Add each timeline milestone with year, title, government body, status, beneficiaries and description."
+                              : isOurTeam
+                                ? "Add each team member with photo, name, role, qualification, designation, email and bio."
+                                : isOurApproach
+                                  ? "Add each approach/objective with icon, image, title and description."
                   : "Manage page hero and content blocks."}
             </p>
           </div>
@@ -480,7 +528,7 @@ const PageEditor = () => {
             </div>
           )}
 
-          {!isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
+          {!isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && (
             <div className="panel">
               <div className="panel-title">{isVideoGallery ? "Add Video URL" : "Media Upload"}</div>
               {isVideoGallery ? (
@@ -553,6 +601,14 @@ const PageEditor = () => {
                           ? "Competition Events"
                           : isMythsTaboos
                             ? "Myths & Taboos Items"
+                            : isMenstrualProducts
+                              ? "Menstrual Products"
+                              : isGovernmentInitiatives
+                                ? "Timeline Milestones"
+                                : isOurTeam
+                                  ? "Team Members"
+                                  : isOurApproach
+                                    ? "Approach Items"
                     : "Section Items"}
             </div>
             <div className="row">
@@ -579,6 +635,14 @@ const PageEditor = () => {
                 <input value="competition_events" readOnly />
               ) : isMythsTaboos ? (
                 <input value="myths_items" readOnly />
+              ) : isMenstrualProducts ? (
+                <input value="menstrual_products" readOnly />
+              ) : isGovernmentInitiatives ? (
+                <input value="government_timeline" readOnly />
+              ) : isOurTeam ? (
+                <input value="team_members" readOnly />
+              ) : isOurApproach ? (
+                <input value="approach_items" readOnly />
               ) : (
                 <input
                   placeholder="section key (e.g. core_values)"
@@ -606,6 +670,14 @@ const PageEditor = () => {
                       ? "Add Event"
                     : isMythsTaboos
                       ? "Add Myth/Taboo"
+                    : isMenstrualProducts
+                      ? "Add Product"
+                    : isGovernmentInitiatives
+                      ? "Add Milestone"
+                    : isOurTeam
+                      ? "Add Team Member"
+                    : isOurApproach
+                      ? "Add Approach"
                     : "Add Item"}
             </button>
           </div>
@@ -618,7 +690,7 @@ const PageEditor = () => {
                   <div className="id">{item.id}</div>
                 </div>
                 <div
-                  className={`item-grid ${isPhotoGallery ? "gallery-item-grid" : ""} ${isVideoGallery ? "video-item-grid" : ""} ${isImpactStory || isImpactStories ? "impact-item-grid" : ""} ${isNewsArticles ? "news-item-grid" : ""} ${isFaqs ? "faq-item-grid" : ""} ${isCompetitionEvent ? "competition-item-grid" : ""} ${isMythsTaboos ? "myths-item-grid" : ""}`}
+                  className={`item-grid ${isPhotoGallery ? "gallery-item-grid" : ""} ${isVideoGallery ? "video-item-grid" : ""} ${isImpactStory || isImpactStories ? "impact-item-grid" : ""} ${isNewsArticles ? "news-item-grid" : ""} ${isFaqs ? "faq-item-grid" : ""} ${isCompetitionEvent ? "competition-item-grid" : ""} ${isMythsTaboos ? "myths-item-grid" : ""} ${isMenstrualProducts ? "product-item-grid" : ""} ${isGovernmentInitiatives ? "gov-item-grid" : ""} ${isOurTeam ? "team-item-grid" : ""} ${isOurApproach ? "approach-item-grid" : ""}`}
                 >
                   {isPhotoGallery && (
                     <div className="gallery-preview">
@@ -1008,21 +1080,299 @@ const PageEditor = () => {
                       <option value="inactive">Inactive</option>
                     </select>
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
+                  {isMenstrualProducts && (
+                    <input
+                      className="product-name"
+                      value={item.title || ""}
+                      onChange={(e) => updateItemField(item.id, "title", e.target.value)}
+                      placeholder="Product name (e.g. Menstrual Cup)"
+                    />
+                  )}
+                  {isMenstrualProducts && (
+                    <div className="impact-item-upload">
+                      <div className="impact-image-preview">
+                        {item.image_url ? (
+                          <img src={item.image_url} alt={item.title || "Product"} />
+                        ) : (
+                          <span>No Image</span>
+                        )}
+                      </div>
+                      <label className="upload-item-btn">
+                        {itemUploadingId === item.id ? "Uploading..." : "Upload Image"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => onItemUpload(item.id, e)}
+                          disabled={itemUploadingId === item.id}
+                        />
+                      </label>
+                      <span className="item-file-name">{getMediaFileName(item.image_url)}</span>
+                    </div>
+                  )}
+                  {isMenstrualProducts && (
+                    <select
+                      className="product-color"
+                      value={item.tag || "primary"}
+                      onChange={(e) => updateItemField(item.id, "tag", e.target.value)}
+                    >
+                      <option value="primary">Primary</option>
+                      <option value="secondary">Secondary</option>
+                      <option value="accent">Accent</option>
+                    </select>
+                  )}
+                  {isMenstrualProducts && (
+                    <input
+                      className="product-sort"
+                      type="number"
+                      value={item.sort_order ?? 0}
+                      onChange={(e) => updateItemField(item.id, "sort_order", Number(e.target.value))}
+                      placeholder="Sort Order"
+                    />
+                  )}
+                  {isMenstrualProducts && (
+                    <textarea
+                      className="product-description"
+                      rows="5"
+                      value={item.description || ""}
+                      onChange={(e) => updateItemField(item.id, "description", e.target.value)}
+                      placeholder="Description"
+                    />
+                  )}
+                  {isGovernmentInitiatives && (
+                    <input
+                      className="gov-year"
+                      value={item.subtitle || ""}
+                      onChange={(e) => updateItemField(item.id, "subtitle", e.target.value)}
+                      placeholder="Year (e.g. 2011 or 2016 - 2020)"
+                    />
+                  )}
+                  {isGovernmentInitiatives && (
+                    <input
+                      className="gov-title"
+                      value={item.title || ""}
+                      onChange={(e) => updateItemField(item.id, "title", e.target.value)}
+                      placeholder="Milestone title"
+                    />
+                  )}
+                  {isGovernmentInitiatives && (
+                    <input
+                      className="gov-government"
+                      value={item.meta?.government || ""}
+                      onChange={(e) => updateItemMetaField(item.id, "government", e.target.value)}
+                      placeholder="Government (e.g. Ministry of Health & Family Welfare)"
+                    />
+                  )}
+                  {isGovernmentInitiatives && (
+                    <input
+                      className="gov-status"
+                      value={item.meta?.status || ""}
+                      onChange={(e) => updateItemMetaField(item.id, "status", e.target.value)}
+                      placeholder="Status (e.g. Ongoing national mission)"
+                    />
+                  )}
+                  {isGovernmentInitiatives && (
+                    <input
+                      className="gov-beneficiaries"
+                      value={item.meta?.beneficiaries || ""}
+                      onChange={(e) => updateItemMetaField(item.id, "beneficiaries", e.target.value)}
+                      placeholder="Beneficiaries (e.g. Rural adolescent girls 10-19 years)"
+                    />
+                  )}
+                  {isGovernmentInitiatives && (
+                    <textarea
+                      className="gov-description"
+                      rows="5"
+                      value={item.description || ""}
+                      onChange={(e) => updateItemField(item.id, "description", e.target.value)}
+                      placeholder="Description"
+                    />
+                  )}
+                  {isGovernmentInitiatives && (
+                    <input
+                      className="gov-sort"
+                      type="number"
+                      value={item.sort_order ?? 0}
+                      onChange={(e) => updateItemField(item.id, "sort_order", Number(e.target.value))}
+                      placeholder="Sort Order"
+                    />
+                  )}
+                  {isOurTeam && (
+                    <div className="impact-item-upload">
+                      <div className="impact-image-preview">
+                        {item.image_url ? (
+                          <img src={item.image_url} alt={item.title || "Team member"} />
+                        ) : (
+                          <span>No Photo</span>
+                        )}
+                      </div>
+                      <label className="upload-item-btn">
+                        {itemUploadingId === item.id ? "Uploading..." : "Upload Photo"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => onItemUpload(item.id, e)}
+                          disabled={itemUploadingId === item.id}
+                        />
+                      </label>
+                      <span className="item-file-name">{getMediaFileName(item.image_url)}</span>
+                    </div>
+                  )}
+                  {isOurTeam && (
+                    <input
+                      className="team-name"
+                      value={item.title || ""}
+                      onChange={(e) => updateItemField(item.id, "title", e.target.value)}
+                      placeholder="Full name (e.g. Dr. Suparna Dutta)"
+                    />
+                  )}
+                  {isOurTeam && (
+                    <input
+                      className="team-role"
+                      value={item.subtitle || ""}
+                      onChange={(e) => updateItemField(item.id, "subtitle", e.target.value)}
+                      placeholder="Role / badge (e.g. Principal Investigator)"
+                    />
+                  )}
+                  {isOurTeam && (
+                    <select
+                      className="team-color"
+                      value={item.tag || "primary"}
+                      onChange={(e) => updateItemField(item.id, "tag", e.target.value)}
+                    >
+                      <option value="primary">Primary</option>
+                      <option value="secondary">Secondary</option>
+                      <option value="accent">Accent</option>
+                    </select>
+                  )}
+                  {isOurTeam && (
+                    <input
+                      className="team-qualification"
+                      value={item.meta?.qualification || ""}
+                      onChange={(e) => updateItemMetaField(item.id, "qualification", e.target.value)}
+                      placeholder="Qualification (e.g. Ph.D.)"
+                    />
+                  )}
+                  {isOurTeam && (
+                    <input
+                      className="team-designation"
+                      value={item.meta?.designation || ""}
+                      onChange={(e) => updateItemMetaField(item.id, "designation", e.target.value)}
+                      placeholder="Designation (e.g. Associate Professor)"
+                    />
+                  )}
+                  {isOurTeam && (
+                    <input
+                      className="team-email"
+                      type="email"
+                      value={item.meta?.email || ""}
+                      onChange={(e) => updateItemMetaField(item.id, "email", e.target.value)}
+                      placeholder="Email (optional)"
+                    />
+                  )}
+                  {isOurTeam && (
+                    <textarea
+                      className="team-description"
+                      rows="6"
+                      value={item.description || ""}
+                      onChange={(e) => updateItemField(item.id, "description", e.target.value)}
+                      placeholder="Bio / description shown in the profile popup"
+                    />
+                  )}
+                  {isOurTeam && (
+                    <input
+                      className="team-sort"
+                      type="number"
+                      value={item.sort_order ?? 0}
+                      onChange={(e) => updateItemField(item.id, "sort_order", Number(e.target.value))}
+                      placeholder="Sort Order"
+                    />
+                  )}
+                  {isOurApproach && (
+                    <input
+                      className="approach-title"
+                      value={item.title || ""}
+                      onChange={(e) => updateItemField(item.id, "title", e.target.value)}
+                      placeholder="Title (e.g. Community Sensitization & Mobilization)"
+                    />
+                  )}
+                  {isOurApproach && (
+                    <div className="impact-item-upload">
+                      <div className="impact-image-preview">
+                        {item.image_url ? (
+                          <img src={item.image_url} alt={item.title || "Approach"} />
+                        ) : (
+                          <span>No Image</span>
+                        )}
+                      </div>
+                      <label className="upload-item-btn">
+                        {itemUploadingId === item.id ? "Uploading..." : "Upload Image"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => onItemUpload(item.id, e)}
+                          disabled={itemUploadingId === item.id}
+                        />
+                      </label>
+                      <span className="item-file-name">{getMediaFileName(item.image_url)}</span>
+                    </div>
+                  )}
+                  {isOurApproach && (
+                    <select
+                      className="approach-icon"
+                      value={item.meta?.icon || "smartphone"}
+                      onChange={(e) => updateItemMetaField(item.id, "icon", e.target.value)}
+                    >
+                      <option value="smartphone">Smartphone</option>
+                      <option value="message">Message</option>
+                      <option value="trending">Trending Up</option>
+                      <option value="globe">Globe</option>
+                      <option value="heart">Heart</option>
+                    </select>
+                  )}
+                  {isOurApproach && (
+                    <select
+                      className="approach-color"
+                      value={item.tag || "primary"}
+                      onChange={(e) => updateItemField(item.id, "tag", e.target.value)}
+                    >
+                      <option value="primary">Primary</option>
+                      <option value="secondary">Secondary</option>
+                      <option value="accent">Accent</option>
+                    </select>
+                  )}
+                  {isOurApproach && (
+                    <textarea
+                      className="approach-description"
+                      rows="6"
+                      value={item.description || ""}
+                      onChange={(e) => updateItemField(item.id, "description", e.target.value)}
+                      placeholder="Description"
+                    />
+                  )}
+                  {isOurApproach && (
+                    <input
+                      className="approach-sort"
+                      type="number"
+                      value={item.sort_order ?? 0}
+                      onChange={(e) => updateItemField(item.id, "sort_order", Number(e.target.value))}
+                      placeholder="Sort Order"
+                    />
+                  )}
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && (
                     <input
                       value={item.title || ""}
                       onChange={(e) => updateItemField(item.id, "title", e.target.value)}
                       placeholder="Title"
                     />
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && (
                     <input
                       value={item.subtitle || ""}
                       onChange={(e) => updateItemField(item.id, "subtitle", e.target.value)}
                       placeholder="Subtitle"
                     />
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && (
                     <textarea
                       rows="3"
                       value={item.description || ""}
@@ -1030,28 +1380,28 @@ const PageEditor = () => {
                       placeholder="Description"
                     />
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && (
                     <input
                       value={item.image_url || ""}
                       onChange={(e) => updateItemField(item.id, "image_url", e.target.value)}
                       placeholder="Image URL"
                     />
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && (
                     <input
                       value={item.link_url || ""}
                       onChange={(e) => updateItemField(item.id, "link_url", e.target.value)}
                       placeholder="Link URL"
                     />
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && (
                     <input
                       value={item.tag || ""}
                       onChange={(e) => updateItemField(item.id, "tag", e.target.value)}
                       placeholder="Tag"
                     />
                   )}
-                  {!isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
+                  {!isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && (
                     <input
                       type="number"
                       value={item.sort_order ?? 0}
@@ -1068,7 +1418,7 @@ const PageEditor = () => {
                       placeholder="Sort Order"
                     />
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && (
                     <textarea
                       rows="3"
                       value={item.meta ? JSON.stringify(item.meta) : ""}
@@ -1320,6 +1670,107 @@ const Wrap = styled.div`
   .myths-item-grid {
     grid-template-columns: minmax(0, 1fr) 180px;
     align-items: start;
+  }
+
+  .product-item-grid {
+    grid-template-columns: minmax(0, 1fr) 150px 130px;
+    align-items: start;
+  }
+
+  .product-name {
+    grid-column: 1 / -1;
+  }
+
+  .product-color {
+    grid-column: 2;
+  }
+
+  .product-sort {
+    grid-column: 3;
+  }
+
+  .product-description {
+    grid-column: 1 / -1;
+  }
+
+  .gov-item-grid {
+    grid-template-columns: 140px minmax(0, 1fr) 130px;
+    align-items: start;
+  }
+
+  .gov-year {
+    grid-column: 1;
+  }
+
+  .gov-title {
+    grid-column: 2 / -1;
+  }
+
+  .gov-government,
+  .gov-status,
+  .gov-beneficiaries {
+    grid-column: 1 / -1;
+  }
+
+  .gov-sort {
+    grid-column: 1;
+  }
+
+  .gov-description {
+    grid-column: 1 / -1;
+  }
+
+  .team-item-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 130px;
+    align-items: start;
+  }
+
+  .team-name {
+    grid-column: 1 / -1;
+  }
+
+  .team-role,
+  .team-qualification,
+  .team-designation,
+  .team-email {
+    grid-column: 1 / -1;
+  }
+
+  .team-color {
+    grid-column: 1;
+  }
+
+  .team-sort {
+    grid-column: 2;
+  }
+
+  .team-description {
+    grid-column: 1 / -1;
+  }
+
+  .approach-item-grid {
+    grid-template-columns: minmax(0, 1fr) 150px 130px;
+    align-items: start;
+  }
+
+  .approach-title {
+    grid-column: 1 / -1;
+  }
+
+  .approach-icon {
+    grid-column: 2;
+  }
+
+  .approach-color {
+    grid-column: 3;
+  }
+
+  .approach-description {
+    grid-column: 1 / -1;
+  }
+
+  .approach-sort {
+    grid-column: 1;
   }
 
   .impact-title {
@@ -1589,6 +2040,22 @@ const Wrap = styled.div`
     }
 
     .myths-item-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .product-item-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .gov-item-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .team-item-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .approach-item-grid {
       grid-template-columns: 1fr;
     }
 

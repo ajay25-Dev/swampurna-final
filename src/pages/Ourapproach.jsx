@@ -1,43 +1,64 @@
 import React from 'react';
 import styled from 'styled-components';
 import { FiSmartphone, FiMessageCircle, FiTrendingUp, FiGlobe, FiHeart } from 'react-icons/fi';
+import { useContentItems } from '../hooks/useContentItems';
 import image1 from '../assets/images/img18.png';
 import image2 from '../assets/images/img19.png';
 import image3 from '../assets/images/img20.png';
 import image4 from '../assets/images/img21.png';
 import image5 from '../assets/images/img22.png';
 
+const ICONS = {
+  smartphone: FiSmartphone,
+  message: FiMessageCircle,
+  trending: FiTrendingUp,
+  globe: FiGlobe,
+  heart: FiHeart,
+};
+
+const fallbackApproaches = [
+  {
+    title: '🧠 Psychometric Screening & Cognitive Mapping',
+    description: 'We aim to move beyond generic surveys by developing a validated Psychometric Screening Tool tailored to unique socio-cultural parameters. The Science: Using the AKAB (Awareness, Knowledge, Attitude & Behaviour) mapping technique, we assess the psychological issues and awareness levels regarding Menstrual Health and Hygiene (MHH). The Method: The tool stratifies the population into three distinct cognitive levels to ensure help is directed where it is needed most: Level 1: Normal (Sufficient awareness & well-being). Level 2: Mild to Moderate concerns. Level 3: Severe (Low awareness & well-being).',
+    image_url: image1,
+    tag: 'primary',
+    meta: { icon: 'smartphone' },
+    sort_order: 0,
+  },
+  {
+    title: '📲 Tech-Driven Cognitive Intervention',
+    description: 'Our goal is to design scientifically tailored, age-specific, and interactive technological interventions to improve the cognitive levels of people living in rural and semi-rural areas. Innovation: We integrate state-of-the-art tools including Android Applications, Gaming, Animation, and AR/VR (Augmented/Virtual Reality). Holistic Wellness: Beyond information, we provide response-based mechanisms to address mental health and social stigmas. This includes "Cycle Syncing", personalized learning modules, and other techniques designed to alleviate menstrual distress for those with mild to moderate issues.',
+    image_url: image2,
+    tag: 'secondary',
+    meta: { icon: 'message' },
+    sort_order: 1,
+  },
+  {
+    title: '🤝 Community Sensitization & Mobilization',
+    description: 'Technology cannot work in isolation. A primary objective is to sensitize and mobilize the entire community to ensure wider and sustained acceptance of the program for a lasting impact. Participatory Communication: We use a "bottom-up" approach, engaging the community through specific algorithms like Head Count, Head Nod, and Full-Fledged Participation to build trust. Inclusivity: We actively include male members in sensitization drives to mitigate the patriarchal stigma surrounding menstruation, improving the mental well-being of the entire family unit. Sustainability: We aim to form Self Help Groups (SHGs) from Level 1 participants to create self-sustainable models of peer support within villages.',
+    image_url: image3,
+    tag: 'accent',
+    meta: { icon: 'trending' },
+    sort_order: 2,
+  },
+  {
+    title: '🛡️ Safety, Efficacy & Scalability',
+    description: 'We are committed to rigorous scientific validation. Our final objective is to strictly test the safety and efficacy of the tools and technology designed for this purpose. Validation: Through baseline evaluations and follow-ups (2-5 weeks post-intervention), we measure behavioural change and the effectiveness of our digital tools. National Scalability: By creating a "response-based mechanism," we are developing a prototype that serves as a scalable model for national menstrual health strategies, ready to be replicated across diverse Indian states.',
+    image_url: image4,
+    tag: 'primary',
+    meta: { icon: 'globe' },
+    sort_order: 3,
+  },
+];
+
 const Ourapproach = () => {
-  const approaches = [
-    {
-      icon: FiSmartphone,
-      title: '🧠 Psychometric Screening & Cognitive Mapping',
-      description: 'We aim to move beyond generic surveys by developing a validated Psychometric Screening Tool tailored to unique socio-cultural parameters. The Science: Using the AKAB (Awareness, Knowledge, Attitude & Behaviour) mapping technique, we assess the psychological issues and awareness levels regarding Menstrual Health and Hygiene (MHH). The Method: The tool stratifies the population into three distinct cognitive levels to ensure help is directed where it is needed most: Level 1: Normal (Sufficient awareness & well-being). Level 2: Mild to Moderate concerns. Level 3: Severe (Low awareness & well-being).',
-      image: image1,
-      color: 'primary'
-    },
-    {
-      icon: FiMessageCircle,
-      title: '📲 Tech-Driven Cognitive Intervention',
-      description: 'Our goal is to design scientifically tailored, age-specific, and interactive technological interventions to improve the cognitive levels of people living in rural and semi-rural areas. Innovation: We integrate state-of-the-art tools including Android Applications, Gaming, Animation, and AR/VR (Augmented/Virtual Reality). Holistic Wellness: Beyond information, we provide response-based mechanisms to address mental health and social stigmas. This includes "Cycle Syncing", personalized learning modules, and other techniques designed to alleviate menstrual distress for those with mild to moderate issues.',
-      image: image2,
-      color: 'secondary'
-    },
-    {
-      icon: FiTrendingUp,
-      title: '🤝 Community Sensitization & Mobilization',
-      description: 'Technology cannot work in isolation. A primary objective is to sensitize and mobilize the entire community to ensure wider and sustained acceptance of the program for a lasting impact. Participatory Communication: We use a "bottom-up" approach, engaging the community through specific algorithms like Head Count, Head Nod, and Full-Fledged Participation to build trust. Inclusivity: We actively include male members in sensitization drives to mitigate the patriarchal stigma surrounding menstruation, improving the mental well-being of the entire family unit. Sustainability: We aim to form Self Help Groups (SHGs) from Level 1 participants to create self-sustainable models of peer support within villages.',
-      image: image3,
-      color: 'accent'
-    },
-    {
-      icon: FiGlobe,
-      title: '🛡️ Safety, Efficacy & Scalability',
-      description: 'We are committed to rigorous scientific validation. Our final objective is to strictly test the safety and efficacy of the tools and technology designed for this purpose. Validation: Through baseline evaluations and follow-ups (2-5 weeks post-intervention), we measure behavioural change and the effectiveness of our digital tools. National Scalability: By creating a "response-based mechanism," we are developing a prototype that serves as a scalable model for national menstrual health strategies, ready to be replicated across diverse Indian states.',
-      image: image4,
-      color: 'primary'
-    },
-  ];
+  const { items } = useContentItems({
+    page: 'Ourapproach',
+    section: 'approach_items',
+    fallback: fallbackApproaches,
+  });
+
+  const approaches = [...(items || [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
   return (
     <PageWrapper>
@@ -60,23 +81,27 @@ const Ourapproach = () => {
 
       {/* Approaches Section */}
       <ApproachesSection>
-        {approaches.map((approach, index) => (
-          <ApproachCard key={index} className={index % 2 === 0 ? 'image-left' : 'image-right'}>
-            <div className="image-container">
-              <img src={approach.image} alt={approach.title} />
-              <div className={`image-overlay color-${approach.color}`}></div>
-            </div>
-            <div className="content-container">
-              <div className={`icon-wrapper color-${approach.color}`}>
-                <approach.icon />
+        {approaches.map((approach, index) => {
+          const Icon = ICONS[approach.meta?.icon] || FiSmartphone;
+          const color = approach.tag || 'primary';
+          return (
+            <ApproachCard key={approach.id || index} className={index % 2 === 0 ? 'image-left' : 'image-right'}>
+              <div className="image-container">
+                <img src={approach.image_url} alt={approach.title} />
+                <div className={`image-overlay color-${color}`}></div>
               </div>
-              <span className="approach-number">{String(index + 1).padStart(2, '0')}</span>
-              <h3>{approach.title}</h3>
-              <p>{approach.description}</p>
-              <div className={`accent-line color-${approach.color}`}></div>
-            </div>
-          </ApproachCard>
-        ))}
+              <div className="content-container">
+                <div className={`icon-wrapper color-${color}`}>
+                  <Icon />
+                </div>
+                <span className="approach-number">{String(index + 1).padStart(2, '0')}</span>
+                <h3>{approach.title}</h3>
+                <p>{approach.description}</p>
+                <div className={`accent-line color-${color}`}></div>
+              </div>
+            </ApproachCard>
+          );
+        })}
       </ApproachesSection>
 
       {/* Quote Section */}

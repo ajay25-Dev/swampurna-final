@@ -1,45 +1,58 @@
 import React from 'react';
 import styled from 'styled-components';
-import { FiPackage } from 'react-icons/fi';
+import { useContentItems } from '../hooks/useContentItems';
 import MenstrualClothimg from '../assets/images/images1/MenstrualClothimg.png';
 import Reusablepadimg from '../assets/images/images1/Reusablepadimg.png';
 import sanitarypadimg from '../assets/images/images1/sanitarypadimg.png';
 import Tamponimg from '../assets/images/images1/Tamponimg.png';
 import MenstrualCupimg from '../assets/images/images1/MenstrualCupimg.png';
 
+const fallbackProducts = [
+  {
+    title: 'Menstrual Cloth',
+    image_url: MenstrualClothimg,
+    description: 'Cloths are reusable pieces of fabric worn externally to the body, in underwear or tied to the waist to absorb menstrual flow. They are made from either newly purchased pieces of fabric (mostly cotton) or old fabric repurposed from clothing or another use. There is no guidance on how long clothes can be reused, but it is generally agreed that this should be for no longer than 1 year. They are consumable and require regular assessment of supply, availability and affordability.',
+    tag: 'primary',
+    sort_order: 0,
+  },
+  {
+    title: 'Reusable Pad',
+    image_url: Reusablepadimg,
+    description: 'Reusable pads are worn externally to the body in the underwear, to absorb menstrual flow and held in place usually by snaps. They are made from a variety of natural or synthetic materials. After use, they are washed, dried and re-used for approximately one year. They are consumables which require regular assessment of supply, availability and affordability.',
+    tag: 'secondary',
+    sort_order: 1,
+  },
+  {
+    title: 'Disposable Sanitary Pad',
+    image_url: sanitarypadimg,
+    description: 'Disposable pads are worn externally to the body in the underwear to absorb menstrual flow. They are disposed of after a maximum of 8 hours; they are therefore consumable, which requires regular assessment of supply, availability and affordability. Pads come in various sizes, absorbencies and materials and consist of a layered design made of blends of plastics, rayon and cotton. Pads should include wings to prevent leakage and keep the pad more securely in place.',
+    tag: 'accent',
+    sort_order: 2,
+  },
+  {
+    title: 'Tampon',
+    image_url: Tamponimg,
+    description: 'Tampons are absorbent materials made from cotton and/or rayon that are inserted into the vagina to absorb menstrual flow. They expand with moisture and thereby avoid leakage. They can be worn for up to 8 hours, after which they are removed using the removal string, and disposed of. They come in a variety of sizes, materials and with or without an applicator to assist insertion. Tampons are consumables which require regular assessment of supply, availability and affordability.',
+    tag: 'primary',
+    sort_order: 3,
+  },
+  {
+    title: 'Menstrual Cup',
+    image_url: MenstrualCupimg,
+    description: 'The menstrual cup is a non-absorbent bell-shaped device that is inserted into the vagina to collect menstrual flow. It creates a seal and is held in place by the walls of the vagina. It is typically made of medical-grade silicone. It collects three times more blood than pads or tampons and needs to be emptied every 6-12 hours, after which it is rinsed and re-inserted (if facilities allow). After each menstrual cycle the cup must be boiled for 5-10 minutes. Most manufacturers offer at least two sizes, and different shapes are becoming more common. Cups are reusable for 5-10 years.',
+    tag: 'secondary',
+    sort_order: 4,
+  },
+];
+
 const Menstrualproducts = () => {
-  const products = [
-    {
-      name: 'Menstrual Cloth',
-      image: MenstrualClothimg,
-      description: 'Cloths are reusable pieces of fabric worn externally to the body, in underwear or tied to the waist to absorb menstrual flow. They are made from either newly purchased pieces of fabric (mostly cotton) or old fabric repurposed from clothing or another use. There is no guidance on how long clothes can be reused, but it is generally agreed that this should be for no longer than 1 year. They are consumable and require regular assessment of supply, availability and affordability.',
-      color: 'primary'
-    },
-    {
-      name: 'Reusable Pad',
-      image: Reusablepadimg,
-      description: 'Reusable pads are worn externally to the body in the underwear, to absorb menstrual flow and held in place usually by snaps. They are made from a variety of natural or synthetic materials. After use, they are washed, dried and re-used for approximately one year. They are consumables which require regular assessment of supply, availability and affordability.',
-      color: 'secondary'
-    },
-    {
-      name: 'Disposable Sanitary Pad',
-      image: sanitarypadimg,
-      description: 'Disposable pads are worn externally to the body in the underwear to absorb menstrual flow. They are disposed of after a maximum of 8 hours; they are therefore consumable, which requires regular assessment of supply, availability and affordability. Pads come in various sizes, absorbencies and materials and consist of a layered design made of blends of plastics, rayon and cotton. Pads should include wings to prevent leakage and keep the pad more securely in place.',
-      color: 'accent'
-    },
-    {
-      name: 'Tampon',
-      image: Tamponimg,
-      description: 'Tampons are absorbent materials made from cotton and/or rayon that are inserted into the vagina to absorb menstrual flow. They expand with moisture and thereby avoid leakage. They can be worn for up to 8 hours, after which they are removed using the removal string, and disposed of. They come in a variety of sizes, materials and with or without an applicator to assist insertion. Tampons are consumables which require regular assessment of supply, availability and affordability.',
-      color: 'primary'
-    },
-    {
-      name: 'Menstrual Cup',
-      image: MenstrualCupimg,
-      description: 'The menstrual cup is a non-absorbent bell-shaped device that is inserted into the vagina to collect menstrual flow. It creates a seal and is held in place by the walls of the vagina. It is typically made of medical-grade silicone. It collects three times more blood than pads or tampons and needs to be emptied every 6-12 hours, after which it is rinsed and re-inserted (if facilities allow). After each menstrual cycle the cup must be boiled for 5-10 minutes. Most manufacturers offer at least two sizes, and different shapes are becoming more common. Cups are reusable for 5-10 years.',
-      color: 'secondary'
-    }
-  ];
+  const { items } = useContentItems({
+    page: 'Menstrualproducts',
+    section: 'menstrual_products',
+    fallback: fallbackProducts,
+  });
+
+  const products = [...(items || [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
   return (
     <PageWrapper>
@@ -64,11 +77,11 @@ const Menstrualproducts = () => {
       {/* Products Grid */}
       <ProductsGrid>
         {products.map((product, i) => (
-          <ProductCard key={i} className={`color-${product.color}`}>
+          <ProductCard key={product.id || i} className={`color-${product.tag || 'primary'}`}>
             <div className="product-image">
-              <img src={product.image} alt={product.name} />
+              <img src={product.image_url} alt={product.title} />
             </div>
-            <h4>{product.name}</h4>
+            <h4>{product.title}</h4>
             <p>{product.description}</p>
           </ProductCard>
         ))}

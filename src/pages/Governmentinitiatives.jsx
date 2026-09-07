@@ -1,8 +1,82 @@
 import React from 'react';
 import styled from 'styled-components';
-import { FiShield } from 'react-icons/fi';
+import { useContentItems } from '../hooks/useContentItems';
+
+const fallbackTimeline = [
+  {
+    subtitle: '2011',
+    title: 'Launch of the Menstrual Hygiene Scheme',
+    meta: { government: 'Ministry of Health & Family Welfare', status: 'Continued under NHM; not discontinued', beneficiaries: 'Rural adolescent girls (10–19 years)' },
+    description: 'The Government of India launched the Menstrual Hygiene Scheme to improve access to affordable sanitary pads for girls in rural areas. ASHA workers supplied low-cost sanitary napkins and conducted awareness sessions on hygiene and safe disposal. The scheme also supported training for frontline workers and created the first structured menstrual health programme at the national level.',
+    sort_order: 0,
+  },
+  {
+    subtitle: '2014',
+    title: 'Swachh Bharat Mission and Inclusion of MHM in School Sanitation',
+    meta: { government: 'Ministry of Jal Shakti (then Drinking Water & Sanitation)', status: 'Ongoing national mission', beneficiaries: 'School-going girls and women in rural & urban areas' },
+    description: 'The launch of Swachh Bharat Mission (SBM) strengthened menstrual hygiene indirectly by improving toilets, water facilities, and sanitation infrastructure. Separate toilets for girls, waste-disposal units, and better school sanitation made it easier for girls to manage their periods with dignity.',
+    sort_order: 1,
+  },
+  {
+    subtitle: '2015',
+    title: 'National MHM Guidelines and Inclusion under Beti Bachao Beti Padhao (BBBP)',
+    meta: { government: 'Ministry of Drinking Water & Sanitation; Ministry of Women & Child Development', status: 'Guidelines remain in place', beneficiaries: 'School-going girls and adolescent girls' },
+    description: 'The first-ever National Guidelines on Menstrual Hygiene Management (MHM) were released in 2015. These guidelines helped schools, districts, and states understand how to provide safe toilets, disposal systems, awareness education, and stigma-free environments for menstruating girls. MHM was also added under BBBP to promote awareness and empowerment.',
+    sort_order: 2,
+  },
+  {
+    subtitle: '2016 – 2020',
+    title: 'Advancing Menstrual Health Services',
+    meta: { government: 'Ministry of Health & Family Welfare; State NHM units', status: 'Continued', beneficiaries: 'Adolescent girls (10–19), especially in rural areas' },
+    description: 'During this period, states expanded pad distribution under NHM and supported the production of low-cost pads by Self-Help Groups (SHGs). Schools received incinerators and disposal bins, and large-scale awareness drives were conducted. Training for ASHAs, Anganwadi Workers, and school teachers strengthened menstrual education at community level.',
+    sort_order: 3,
+  },
+  {
+    subtitle: '2018',
+    title: 'National Reviews',
+    meta: { government: 'Independent reviews + NHM evaluations', status: 'Ongoing', beneficiaries: 'Girls in remote, marginalised, or low-income areas' },
+    description: 'National reviews revealed that despite strong policies, implementation remained uneven. Many schools lacked functional toilets, disposal units, and regular pad supply. Stigma, poor awareness, and lack of monitoring slowed progress. These findings pushed for stronger, rights-based and infrastructure-focused menstrual health policies.',
+    sort_order: 4,
+  },
+  {
+    subtitle: '2022',
+    title: 'Reinforcing of Menstrual Hygiene Scheme via ASHAs',
+    meta: { government: 'Ministry of Health & Family Welfare', status: 'Active', beneficiaries: 'Rural adolescent girls dependent on subsidised pads' },
+    description: 'In 2022, the government reiterated its commitment to continue the Menstrual Hygiene Scheme through ASHA workers. Pad distribution, awareness sessions, and adolescent health counselling remained active in states that opted for the programme.',
+    sort_order: 5,
+  },
+  {
+    subtitle: '2023',
+    title: 'Release of the Draft National Menstrual Hygiene Policy',
+    meta: { government: 'Ministry of Health & Family Welfare, Ministry of Women & Child Development', status: 'Draft', beneficiaries: 'All menstruators across India' },
+    description: "The government released India's first national-level draft policy aimed at unifying menstrual health efforts across sectors health, sanitation, education, and gender. The draft emphasised affordable products, safe disposal, stigma removal, school sanitation, funding, and coordination between ministries.",
+    sort_order: 6,
+  },
+  {
+    subtitle: '2024',
+    title: 'Menstrual Hygiene Policy for School-Going Girls (Classes 6–12)',
+    meta: { government: 'Union Health Ministry (as directed by Supreme Court)', status: 'Approved in November 2024, implementation to follow', beneficiaries: 'Girls in Classes 6–12 in Government and aided schools' },
+    description: 'The government framed a dedicated policy to ensure regular access to sanitary pads, disposal units, clean toilets, and menstrual education for schoolgirls. This policy aims to reduce absenteeism, support menstrual dignity, and guarantee that no girl misses school because of her period.',
+    sort_order: 7,
+  },
+  {
+    subtitle: '2025',
+    title: 'Continued State-Level Innovations and Eco-Friendly Approaches',
+    meta: { government: 'State governments + local bodies + NGOs', status: 'Ongoing', beneficiaries: 'Schoolgirls, adolescent girls, women in both rural and urban settings' },
+    description: 'By 2025, multiple states are running innovative programmes including eco-friendly reusable pads, community-level pad banks, improved disposal and waste-management systems, and school MHM strengthening. Many states focus on sustainability, dignity, and reaching the most vulnerable girls in remote or tribal regions.',
+    sort_order: 8,
+  },
+];
 
 const Governmentinitiatives = () => {
+  const { items } = useContentItems({
+    page: 'Governmentinitiatives',
+    section: 'government_timeline',
+    fallback: fallbackTimeline,
+  });
+
+  const timeline = [...(items || [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+
   return (
     <PageWrapper>
       {/* Background Decoration */}
@@ -44,122 +118,26 @@ const Governmentinitiatives = () => {
       <TimelineSection>
         <h2 className="timeline-title">Timeline of Government Initiatives</h2>
         <TimelineContainer>
-          <TimelineItem>
-            <TimelineYear>2011</TimelineYear>
-            <TimelineContent>
-              <h3>Launch of the Menstrual Hygiene Scheme</h3>
-              <div className="timeline-meta">
-                <span className="meta-item"><strong>Government:</strong> Ministry of Health & Family Welfare</span>
-                <span className="meta-item"><strong>Status:</strong> Continued under NHM; not discontinued</span>
-                <span className="meta-item"><strong>Beneficiaries:</strong> Rural adolescent girls (10–19 years)</span>
-              </div>
-              <p>The Government of India launched the Menstrual Hygiene Scheme to improve access to affordable sanitary pads for girls in rural areas. ASHA workers supplied low-cost sanitary napkins and conducted awareness sessions on hygiene and safe disposal. The scheme also supported training for frontline workers and created the first structured menstrual health programme at the national level.</p>
-            </TimelineContent>
-          </TimelineItem>
-
-          <TimelineItem>
-            <TimelineYear>2014</TimelineYear>
-            <TimelineContent>
-              <h3>Swachh Bharat Mission and Inclusion of MHM in School Sanitation</h3>
-              <div className="timeline-meta">
-                <span className="meta-item"><strong>Government:</strong> Ministry of Jal Shakti (then Drinking Water & Sanitation)</span>
-                <span className="meta-item"><strong>Status:</strong> Ongoing national mission</span>
-                <span className="meta-item"><strong>Beneficiaries:</strong> School-going girls and women in rural & urban areas</span>
-              </div>
-              <p>The launch of Swachh Bharat Mission (SBM) strengthened menstrual hygiene indirectly by improving toilets, water facilities, and sanitation infrastructure. Separate toilets for girls, waste-disposal units, and better school sanitation made it easier for girls to manage their periods with dignity.</p>
-            </TimelineContent>
-          </TimelineItem>
-
-          <TimelineItem>
-            <TimelineYear>2015</TimelineYear>
-            <TimelineContent>
-              <h3>National MHM Guidelines and Inclusion under Beti Bachao Beti Padhao (BBBP)</h3>
-              <div className="timeline-meta">
-                <span className="meta-item"><strong>Government:</strong> Ministry of Drinking Water & Sanitation; Ministry of Women & Child Development</span>
-                <span className="meta-item"><strong>Status:</strong> Guidelines remain in place</span>
-                <span className="meta-item"><strong>Beneficiaries:</strong> School-going girls and adolescent girls</span>
-              </div>
-              <p>The first-ever National Guidelines on Menstrual Hygiene Management (MHM) were released in 2015. These guidelines helped schools, districts, and states understand how to provide safe toilets, disposal systems, awareness education, and stigma-free environments for menstruating girls. MHM was also added under BBBP to promote awareness and empowerment.</p>
-            </TimelineContent>
-          </TimelineItem>
-
-          <TimelineItem>
-            <TimelineYear>2016 – 2020</TimelineYear>
-            <TimelineContent>
-              <h3>Advancing Menstrual Health Services</h3>
-              <div className="timeline-meta">
-                <span className="meta-item"><strong>Government:</strong> Ministry of Health & Family Welfare; State NHM units</span>
-                <span className="meta-item"><strong>Status:</strong> Continued</span>
-                <span className="meta-item"><strong>Beneficiaries:</strong> Adolescent girls (10–19), especially in rural areas</span>
-              </div>
-              <p>During this period, states expanded pad distribution under NHM and supported the production of low-cost pads by Self-Help Groups (SHGs). Schools received incinerators and disposal bins, and large-scale awareness drives were conducted. Training for ASHAs, Anganwadi Workers, and school teachers strengthened menstrual education at community level.</p>
-            </TimelineContent>
-          </TimelineItem>
-
-          <TimelineItem>
-            <TimelineYear>2018</TimelineYear>
-            <TimelineContent>
-              <h3>National Reviews</h3>
-              <div className="timeline-meta">
-                <span className="meta-item"><strong>Government:</strong> Independent reviews + NHM evaluations</span>
-                <span className="meta-item"><strong>Status:</strong> Ongoing</span>
-                <span className="meta-item"><strong>Beneficiaries impacted:</strong> Girls in remote, marginalised, or low-income areas</span>
-              </div>
-              <p>National reviews revealed that despite strong policies, implementation remained uneven. Many schools lacked functional toilets, disposal units, and regular pad supply. Stigma, poor awareness, and lack of monitoring slowed progress. These findings pushed for stronger, rights-based and infrastructure-focused menstrual health policies.</p>
-            </TimelineContent>
-          </TimelineItem>
-
-          <TimelineItem>
-            <TimelineYear>2022</TimelineYear>
-            <TimelineContent>
-              <h3>Reinforcing of Menstrual Hygiene Scheme via ASHAs</h3>
-              <div className="timeline-meta">
-                <span className="meta-item"><strong>Government:</strong> Ministry of Health & Family Welfare</span>
-                <span className="meta-item"><strong>Status:</strong> Active</span>
-                <span className="meta-item"><strong>Beneficiaries:</strong> Rural adolescent girls dependent on subsidised pads</span>
-              </div>
-              <p>In 2022, the government reiterated its commitment to continue the Menstrual Hygiene Scheme through ASHA workers. Pad distribution, awareness sessions, and adolescent health counselling remained active in states that opted for the programme.</p>
-            </TimelineContent>
-          </TimelineItem>
-
-          <TimelineItem>
-            <TimelineYear>2023</TimelineYear>
-            <TimelineContent>
-              <h3>Release of the Draft National Menstrual Hygiene Policy</h3>
-              <div className="timeline-meta">
-                <span className="meta-item"><strong>Government:</strong> Ministry of Health & Family Welfare, Ministry of Women & Child Development</span>
-                <span className="meta-item"><strong>Status:</strong> Draft</span>
-                <span className="meta-item"><strong>Beneficiaries:</strong> All menstruators across India</span>
-              </div>
-              <p>The government released India's first national-level draft policy aimed at unifying menstrual health efforts across sectors health, sanitation, education, and gender. The draft emphasised affordable products, safe disposal, stigma removal, school sanitation, funding, and coordination between ministries.</p>
-            </TimelineContent>
-          </TimelineItem>
-
-          <TimelineItem>
-            <TimelineYear>2024</TimelineYear>
-            <TimelineContent>
-              <h3>Menstrual Hygiene Policy for School-Going Girls (Classes 6–12)</h3>
-              <div className="timeline-meta">
-                <span className="meta-item"><strong>Government:</strong> Union Health Ministry (as directed by Supreme Court)</span>
-                <span className="meta-item"><strong>Status:</strong> Approved in November 2024, implementation to follow</span>
-                <span className="meta-item"><strong>Beneficiaries:</strong> Girls in Classes 6–12 in Government and aided schools</span>
-              </div>
-              <p>The government framed a dedicated policy to ensure regular access to sanitary pads, disposal units, clean toilets, and menstrual education for schoolgirls. This policy aims to reduce absenteeism, support menstrual dignity, and guarantee that no girl misses school because of her period.</p>
-            </TimelineContent>
-          </TimelineItem>
-
-          <TimelineItem>
-            <TimelineYear>2025</TimelineYear>
-            <TimelineContent>
-              <h3>Continued State-Level Innovations and Eco-Friendly Approaches</h3>
-              <div className="timeline-meta">
-                <span className="meta-item"><strong>Government:</strong> State governments + local bodies + NGOs</span>
-                <span className="meta-item"><strong>Status:</strong> Ongoing</span>
-                <span className="meta-item"><strong>Beneficiaries:</strong> Schoolgirls, adolescent girls, women in both rural and urban settings</span>
-              </div>
-              <p>By 2025, multiple states are running innovative programmes including eco-friendly reusable pads, community-level pad banks, improved disposal and waste-management systems, and school MHM strengthening. Many states focus on sustainability, dignity, and reaching the most vulnerable girls in remote or tribal regions.</p>
-            </TimelineContent>
-          </TimelineItem>
+          {timeline.map((milestone, i) => (
+            <TimelineItem key={milestone.id || i}>
+              <TimelineYear>{milestone.subtitle}</TimelineYear>
+              <TimelineContent>
+                <h3>{milestone.title}</h3>
+                <div className="timeline-meta">
+                  {milestone.meta?.government && (
+                    <span className="meta-item"><strong>Government:</strong> {milestone.meta.government}</span>
+                  )}
+                  {milestone.meta?.status && (
+                    <span className="meta-item"><strong>Status:</strong> {milestone.meta.status}</span>
+                  )}
+                  {milestone.meta?.beneficiaries && (
+                    <span className="meta-item"><strong>Beneficiaries:</strong> {milestone.meta.beneficiaries}</span>
+                  )}
+                </div>
+                <p>{milestone.description}</p>
+              </TimelineContent>
+            </TimelineItem>
+          ))}
         </TimelineContainer>
       </TimelineSection>
     </PageWrapper>
@@ -297,27 +275,27 @@ const TimelineSection = styled.section`
 
 const TimelineContainer = styled.div`
   position: relative;
-  padding-left: var(--space-8);
+  padding-left: 44px;
 
   &::before {
     content: '';
     position: absolute;
     left: 20px;
-    top: 0;
-    bottom: 0;
+    top: 4px;
+    bottom: 4px;
     width: 2px;
-    background: linear-gradient(180deg, 
-      var(--color-primary-300) 0%, 
-      var(--color-primary-500) 50%, 
+    background: linear-gradient(180deg,
+      var(--color-primary-300) 0%,
+      var(--color-primary-500) 50%,
       var(--color-secondary-500) 100%
     );
   }
 
   @media (max-width: 768px) {
-    padding-left: var(--space-6);
+    padding-left: 36px;
 
     &::before {
-      left: 15px;
+      left: 16px;
     }
   }
 `;
@@ -325,15 +303,14 @@ const TimelineContainer = styled.div`
 const TimelineItem = styled.div`
   position: relative;
   margin-bottom: var(--space-10);
-  padding-left: var(--space-6);
 
   &::before {
     content: '';
     position: absolute;
-    left: -26px;
-    top: 8px;
-    width: 14px;
-    height: 14px;
+    left: -31px;
+    top: 12px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
     background: var(--gradient-primary);
     border: 3px solid white;
@@ -347,12 +324,12 @@ const TimelineItem = styled.div`
 
   @media (max-width: 768px) {
     margin-bottom: var(--space-8);
-    padding-left: var(--space-4);
 
     &::before {
-      left: -19px;
-      width: 12px;
-      height: 12px;
+      left: -26px;
+      width: 14px;
+      height: 14px;
+      top: 10px;
     }
   }
 `;
