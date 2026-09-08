@@ -31,6 +31,16 @@ export const adminApi = {
     }),
   logout: () => request("/api/auth/logout", { method: "POST" }),
   me: () => request("/api/auth/me"),
+  getDashboardOverview: ({ range = "30", from = "", to = "" } = {}) => {
+    const params = new URLSearchParams();
+    if (from || to) {
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+    } else {
+      params.set("range", range);
+    }
+    return request(`/api/admin/dashboard/overview?${params.toString()}`);
+  },
   getPage: (slug) => request(`/api/content/page/${slug}`),
   upsertPage: (slug, payload) =>
     request(`/api/content/page/${slug}`, {
@@ -71,6 +81,13 @@ export const adminApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  updateCustomer: (id, payload) =>
+    request(`/api/customers/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  deleteCustomer: (id) =>
+    request(`/api/customers/${id}`, { method: "DELETE" }),
   getSupportReports: ({ status = "", limit = 50, offset = 0 } = {}) =>
     request(
       `/api/v1/support/reports?status=${encodeURIComponent(status)}&limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`

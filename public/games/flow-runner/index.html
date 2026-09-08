@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Flow Runner: Period Power</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+        
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Nunito', sans-serif;
+            background-color: #1a1a2e;
+            touch-action: none; /* Prevent scroll on touch */
+        }
+
+        #game-canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .pointer-events-auto { pointer-events: auto; }
+
+        .stamina-container {
+            width: 200px;
+            height: 24px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            border: 2px solid white;
+            overflow: hidden;
+            position: relative;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .stamina-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff4d4d, #4ade80);
+            width: 100%;
+            transition: width 0.2s ease-out, background 0.3s;
+        }
+
+        @keyframes slideInOut {
+            0% { transform: translateY(-50px); opacity: 0; }
+            10% { transform: translateY(0); opacity: 1; }
+            90% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+        .phase-alert { animation: slideInOut 3s forwards; }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-50px) scale(1.5); opacity: 0; }
+        }
+        .floating-text {
+            position: absolute;
+            animation: floatUp 1s ease-out forwards;
+            font-weight: bold;
+            pointer-events: none;
+            text-shadow: 2px 2px 0px #000;
+            font-size: 1.5rem;
+            z-index: 100;
+        }
+
+        .glass-panel {
+            background: rgba(20, 10, 40, 0.7);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        /* Animated Menu Gradient */
+        .animated-bg {
+            background: linear-gradient(-45deg, #2a0845, #6441A5, #1a237e, #311b92);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+        }
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .pulse-btn {
+            animation: pulseGlow 2s infinite;
+        }
+        @keyframes pulseGlow {
+            0% { box-shadow: 0 0 15px rgba(236,72,153,0.4); transform: scale(1); }
+            50% { box-shadow: 0 0 35px rgba(236,72,153,0.8); transform: scale(1.02); }
+            100% { box-shadow: 0 0 15px rgba(236,72,153,0.4); transform: scale(1); }
+        }
+        
+        @media (max-width: 600px) {
+            .stamina-container { width: 140px; }
+            .hud-title { font-size: 1rem; }
+            .hud-score { font-size: 1.5rem; }
+        }
+
+        /* --- NEW MENU UI ANIMATIONS & STYLES --- */
+        @keyframes titleFloat {
+            0%, 100% { transform: translateY(0); text-shadow: 0 0 15px rgba(255,105,180,0.6); }
+            50% { transform: translateY(-8px); text-shadow: 0 0 30px rgba(255,105,180,1), 0 0 10px rgba(255,255,255,0.8); }
+        }
+        .title-animate {
+            animation: titleFloat 4s ease-in-out infinite;
+        }
+        
+        .feature-badge {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 16px;
+            padding: 10px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+        .feature-badge:hover {
+            transform: translateY(-4px) scale(1.05);
+            background: rgba(255,255,255,0.15);
+            border-color: rgba(255,105,180,0.5);
+            box-shadow: 0 8px 20px rgba(236,72,153,0.3);
+        }
+
+        @keyframes float-particle {
+            0%, 100% { transform: translateY(0) translateX(0); opacity: 0.4; }
+            50% { transform: translateY(-30px) translateX(20px); opacity: 0.8; }
+        }
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,105,180,0.6) 0%, rgba(255,105,180,0) 70%);
+            filter: blur(8px);
+            animation: float-particle 6s infinite ease-in-out;
+            pointer-events: none;
+        }
+
+        @keyframes shimmer {
+            100% { left: 200%; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 3D Canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <div id="hud" class="overlay p-4 hidden justify-between">
+        <div class="flex justify-between items-start w-full">
+            <div class="flex flex-col gap-2">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-heart text-2xl text-red-500 drop-shadow"></i>
+                    <div class="stamina-container">
+                        <div id="stamina-bar" class="stamina-fill"></div>
+                    </div>
+                </div>
+                <div class="bg-white/20 backdrop-blur-sm px-4 py-1 rounded-full text-white font-bold inline-block border border-white/30 text-center w-fit shadow-lg text-lg hud-title">
+                    DAY <span id="day-counter">1</span>
+                </div>
+                <div id="phase-name" class="text-white font-bold text-sm tracking-widest uppercase drop-shadow-md">
+                    Menstrual Phase
+                </div>
+            </div>
+
+            <div class="flex flex-col items-end gap-2 pointer-events-auto">
+                <div class="flex gap-2 mb-2">
+                    <button id="pause-btn" class="text-white text-xl bg-black/40 p-2 rounded-full w-10 h-10 flex items-center justify-center border-2 border-white/20 shadow-lg transform active:scale-90 transition">
+                        <i class="fas fa-pause"></i>
+                    </button>
+                    <button id="settings-menu-btn" class="text-white text-xl bg-black/40 p-2 rounded-full w-10 h-10 flex items-center justify-center border-2 border-white/20 shadow-lg transform active:scale-90 transition">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    <button id="mute-btn" class="text-white text-xl bg-black/40 p-2 rounded-full w-10 h-10 flex items-center justify-center border-2 border-white/20 shadow-lg transform active:scale-90 transition">
+                        <i id="mute-icon" class="fas fa-volume-up"></i>
+                    </button>
+                </div>
+                <div class="bg-black/50 px-4 py-2 rounded-xl text-white font-black text-2xl border-2 border-white/20 shadow-lg text-right hud-score">
+                    <span class="text-xs text-gray-300 block leading-tight">SCORE</span>
+                    <span id="score-counter">0</span>
+                </div>
+                <div class="flex items-center gap-2 bg-pink-500/30 px-3 py-1 rounded-full border border-pink-400/50 shadow-lg">
+                    <span class="text-pink-300 text-lg drop-shadow">🌸</span>
+                    <span id="coin-counter" class="text-white font-bold text-lg">0</span>
+                </div>
+                <div id="active-powerup" class="text-orange-400 font-bold text-sm hidden animate-pulse drop-shadow-md bg-black/40 px-2 py-1 rounded-md">
+                    <i class="fas fa-shield-alt"></i> SHIELD ACTIVE!
+                </div>
+            </div>
+        </div>
+
+        <div id="phase-alert-container" class="absolute top-24 left-1/2 transform -translate-x-1/2 hidden pointer-events-none w-11/12 max-w-sm">
+            <div id="phase-alert-box" class="glass-panel px-6 py-4 rounded-3xl text-white text-center border-t-4 shadow-2xl">
+                <h2 id="phase-alert-title" class="text-2xl font-black mb-1 drop-shadow-lg">New Phase!</h2>
+                <p id="phase-alert-desc" class="text-sm opacity-90 drop-shadow-md">Focus on dodging!</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="main-menu" class="overlay justify-center items-center pointer-events-auto animated-bg z-50 overflow-hidden">
+        
+        <!-- Decorative Floating Particles -->
+        <div class="particle w-32 h-32 top-[10%] left-[15%]" style="animation-delay: 0s;"></div>
+        <div class="particle w-48 h-48 bottom-[15%] right-[10%]" style="background: radial-gradient(circle, rgba(136,14,79,0.5) 0%, rgba(136,14,79,0) 70%); animation-delay: 1.5s;"></div>
+        <div class="particle w-24 h-24 top-[40%] right-[20%]" style="background: radial-gradient(circle, rgba(49,27,146,0.6) 0%, rgba(49,27,146,0) 70%); animation-delay: 3s;"></div>
+        
+        <!-- Center Giant Glow -->
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-pink-500/20 rounded-full blur-[100px] pointer-events-none"></div>
+        
+        <div class="glass-panel p-6 sm:p-8 rounded-3xl text-center max-w-md w-[90%] mx-auto flex flex-col items-center shadow-[0_15px_50px_rgba(0,0,0,0.6)] border-t border-l border-white/20 relative z-10 backdrop-blur-xl">
+            
+            <!-- Animated Icon Top -->
+            <div class="w-16 h-16 bg-gradient-to-br from-pink-400 to-purple-600 rounded-full flex items-center justify-center mb-3 shadow-[0_0_20px_rgba(236,72,153,0.6)] animate-bounce border-2 border-white/40">
+                <i class="fas fa-running text-white text-3xl ml-1"></i>
+            </div>
+
+            <!-- Title -->
+            <h1 class="text-5xl sm:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-pink-100 to-pink-400 leading-none title-animate tracking-tight pb-1">
+                FLOW
+            </h1>
+            <h1 class="text-4xl sm:text-5xl font-black text-white mb-2 leading-tight title-animate tracking-wide" style="animation-delay: -2s;">
+                RUNNER
+            </h1>
+            
+            <!-- Subtitle Badge -->
+            <div class="bg-gradient-to-r from-pink-600/50 via-purple-600/50 to-pink-600/50 px-5 py-1.5 rounded-full border border-pink-300/30 mb-6 shadow-inner">
+                <h2 class="text-sm font-bold text-pink-100 tracking-[0.2em] uppercase drop-shadow-md">Period Power</h2>
+            </div>
+            
+            <!-- Beautiful Features Grid -->
+            <div class="grid grid-cols-2 gap-3 sm:gap-4 w-full mb-6">
+                <div class="feature-badge flex flex-col items-center justify-center text-center group cursor-default">
+                    <span class="text-3xl drop-shadow-lg mb-1 group-hover:scale-110 transition duration-300">💧</span> 
+                    <span class="text-[11px] text-white/90 font-black uppercase tracking-widest">+ Stamina</span>
+                </div>
+                <div class="feature-badge flex flex-col items-center justify-center text-center group cursor-default">
+                    <span class="text-3xl drop-shadow-lg mb-1 group-hover:scale-110 transition duration-300">🍫</span> 
+                    <span class="text-[11px] text-white/90 font-black uppercase tracking-widest">D1-5 Bonus</span>
+                </div>
+                <div class="feature-badge flex flex-col items-center justify-center text-center group cursor-default">
+                    <span class="text-3xl drop-shadow-lg mb-1 group-hover:scale-110 transition duration-300">♨️</span> 
+                    <span class="text-[11px] text-white/90 font-black uppercase tracking-widest">1-Hit Shield</span>
+                </div>
+                <div class="feature-badge flex flex-col items-center justify-center text-center group cursor-default">
+                    <span class="text-3xl drop-shadow-lg mb-1 group-hover:scale-110 transition duration-300">🌸</span> 
+                    <span class="text-[11px] text-white/90 font-black uppercase tracking-widest">Wellness</span>
+                </div>
+            </div>
+
+            <!-- Controls Info -->
+            <div class="text-center w-full mb-6 bg-black/40 py-2.5 rounded-xl border border-white/10 shadow-inner">
+                <p class="text-[10px] sm:text-xs text-yellow-300 font-bold tracking-widest flex items-center justify-center gap-2">
+                    <i class="fas fa-hand-pointer animate-pulse"></i> DRAG / ARROWS TO MOVE
+                </p>
+            </div>
+
+            <!-- Buttons -->
+            <div class="flex gap-4 w-full mb-1">
+                <button id="settings-btn" class="flex-1 bg-white/10 hover:bg-white/20 text-white font-bold py-3 px-2 rounded-xl shadow-lg border border-white/20 transform transition active:scale-95 group flex flex-col items-center justify-center gap-1">
+                    <i class="fas fa-cog text-xl group-hover:rotate-90 transition duration-500"></i>
+                    <span class="text-[10px] uppercase tracking-wider">Settings</span>
+                </button>
+                <button id="start-btn" class="flex-[2] relative overflow-hidden bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white font-black py-3 px-6 rounded-xl shadow-[0_0_20px_rgba(236,72,153,0.5)] transform transition hover:scale-105 active:scale-95 pulse-btn group">
+                    <span class="relative z-10 flex items-center justify-center text-xl tracking-wider">START <i class="fas fa-play ml-2 group-hover:translate-x-1 transition duration-300"></i></span>
+                    <!-- Flashy Shimmer -->
+                    <div class="absolute top-0 -left-[100%] w-1/2 h-full bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-12 group-hover:animate-[shimmer_1s_infinite]"></div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-screen" class="overlay justify-center items-center pointer-events-auto bg-black/80 z-[60] hidden">
+        <div class="glass-panel p-6 rounded-3xl max-w-md w-[90%] mx-auto text-white shadow-2xl border border-gray-400/30">
+            <h2 class="text-3xl font-black text-center mb-6 drop-shadow-lg text-pink-300">Settings</h2>
+            
+            <div class="space-y-4 mb-6">
+                <label class="flex justify-between items-center bg-white/10 p-3 rounded-xl border border-white/10">
+                    <span class="font-bold"><i class="fas fa-music w-6 text-center"></i> Music</span>
+                    <input type="checkbox" id="toggle-music" checked class="w-5 h-5 accent-pink-500">
+                </label>
+                <label class="flex justify-between items-center bg-white/10 p-3 rounded-xl border border-white/10">
+                    <span class="font-bold"><i class="fas fa-volume-up w-6 text-center"></i> Sound Effects</span>
+                    <input type="checkbox" id="toggle-sfx" checked class="w-5 h-5 accent-pink-500">
+                </label>
+                <label class="flex justify-between items-center bg-white/10 p-3 rounded-xl border border-white/10">
+                    <span class="font-bold"><i class="fas fa-eye w-6 text-center"></i> Show Game UI</span>
+                    <input type="checkbox" id="toggle-ui" checked class="w-5 h-5 accent-pink-500">
+                </label>
+                
+                <div id="theme-selection-container" class="bg-white/10 p-3 rounded-xl border border-white/10">
+                    <span class="font-bold block mb-2"><i class="fas fa-image w-6 text-center"></i> Environment Theme</span>
+                    <select id="theme-selector" class="w-full bg-black/50 text-white p-2 rounded-lg border border-gray-500 outline-none">
+                        <option value="school">🏫 Schools & Children</option>
+                        <option value="village">🌾 Village & Farmers</option>
+                        <option value="city">🏙️ City Life</option>
+                    </select>
+                </div>
+            </div>
+
+            <button id="close-settings-btn" class="w-full bg-pink-500 hover:bg-pink-400 text-white font-bold py-3 rounded-xl shadow-lg transform transition active:scale-95 text-lg">
+                Done ✓
+            </button>
+        </div>
+    </div>
+
+    <div id="pause-screen" class="overlay justify-center items-center pointer-events-auto bg-black/70 z-50 hidden">
+        <div class="glass-panel p-8 rounded-3xl text-center max-w-sm w-[90%] mx-auto shadow-2xl border border-white/20">
+            <h2 class="text-4xl font-black text-white mb-6 drop-shadow-lg tracking-widest">PAUSED</h2>
+            <div class="flex flex-col gap-4">
+                <button id="resume-btn" class="bg-green-500 hover:bg-green-400 text-white font-bold py-3 px-8 rounded-xl shadow-lg transform transition active:scale-95 text-lg">
+                    RESUME <i class="fas fa-play ml-2"></i>
+                </button>
+                <button id="quit-btn" class="bg-red-500 hover:bg-red-400 text-white font-bold py-3 px-8 rounded-xl shadow-lg transform transition active:scale-95 text-lg">
+                    QUIT <i class="fas fa-sign-out-alt ml-2"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-over" class="overlay justify-center items-center pointer-events-auto bg-black/90 z-50 hidden">
+        <div class="glass-panel p-6 sm:p-8 rounded-3xl text-center max-w-md w-[90%] mx-auto shadow-2xl border-2 border-red-500/40">
+            <h2 class="text-4xl font-black text-red-400 mb-2 drop-shadow-lg">Out of Breath!</h2>
+            <p class="text-white/90 mb-6 drop-shadow text-sm">You need to rest. (Stamina depleted)</p>
+            
+            <div class="bg-black/30 rounded-xl p-4 mb-6 border border-white/10">
+                <div class="text-gray-400 text-xs font-bold tracking-widest mb-1">FINAL SCORE</div>
+                <div id="final-score" class="text-4xl sm:text-5xl font-black text-white mb-3 drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]">0</div>
+                <div class="flex justify-center gap-6 text-sm bg-white/5 py-2 rounded-lg">
+                    <div class="text-pink-300"><i class="fas fa-calendar-alt"></i> Day: <span id="final-days" class="font-bold text-white text-lg">0</span></div>
+                    <div class="text-pink-300"><span class="drop-shadow">🌸</span>: <span id="final-coins" class="font-bold text-white text-lg">0</span></div>
+                </div>
+            </div>
+
+            <button id="restart-btn" class="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white font-bold py-4 rounded-xl text-lg shadow-lg transform transition active:scale-95">
+                TRY AGAIN <i class="fas fa-redo ml-2"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Audio Engine Setup
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Auto-resume AudioContext on FIRST user interaction (CRITICAL FIX FOR BROWSERS)
+        const resumeAudioContext = () => {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            // Remove listeners once resumed
+            document.removeEventListener('click', resumeAudioContext);
+            document.removeEventListener('touchstart', resumeAudioContext);
+        };
+        document.addEventListener('click', resumeAudioContext);
+        document.addEventListener('touchstart', resumeAudioContext);
+        
+        const audio = {
+            isMusicOn: true,
+            isSfxOn: true,
+            musicOscillators: [],
+            musicInterval: null,
+            
+            uiClick: function() {
+                if (!this.isSfxOn) return;
+                try {
+                    if (audioCtx.state === 'suspended') audioCtx.resume();
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(800, audioCtx.currentTime); // Crisper click
+                    osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.05);
+                    gain.gain.setValueAtTime(0.5, audioCtx.currentTime); // LOUDER
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.1);
+                } catch(e){}
+            },
+            
+            play: function(type) {
+                if (!this.isSfxOn || audioCtx.state === 'suspended') return;
+                const time = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                if (type === 'jump') {
+                    // Snappy jump sound
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, time);
+                    osc.frequency.exponentialRampToValueAtTime(1000, time + 0.15);
+                    gainNode.gain.setValueAtTime(0.4, time); // LOUDER
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, time + 0.15);
+                    osc.start(time);
+                    osc.stop(time + 0.15);
+                } else if (type === 'slide') {
+                    // Whoosh slide sound
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(400, time);
+                    osc.frequency.exponentialRampToValueAtTime(100, time + 0.2);
+                    gainNode.gain.setValueAtTime(0.4, time); // LOUDER
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
+                    osc.start(time);
+                    osc.stop(time + 0.2);
+                } else if (type === 'coin') {
+                    // Classic Bling
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(1200, time);
+                    osc.frequency.setValueAtTime(2000, time + 0.05); 
+                    gainNode.gain.setValueAtTime(0.3, time); // LOUDER
+                    gainNode.gain.linearRampToValueAtTime(0, time + 0.2);
+                    osc.start(time);
+                    osc.stop(time + 0.2);
+                } else if (type === 'powerup') {
+                    // 3-step magical chime
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(400, time);
+                    osc.frequency.setValueAtTime(600, time + 0.1);
+                    osc.frequency.setValueAtTime(900, time + 0.2);
+                    gainNode.gain.setValueAtTime(0.3, time); // LOUDER
+                    gainNode.gain.linearRampToValueAtTime(0, time + 0.3);
+                    osc.start(time);
+                    osc.stop(time + 0.3);
+                } else if (type === 'hit') {
+                    // Retro Bloop Down
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(250, time);
+                    osc.frequency.exponentialRampToValueAtTime(40, time + 0.25);
+                    gainNode.gain.setValueAtTime(0.5, time); // LOUDER & CRUNCHIER
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, time + 0.25);
+                    osc.start(time);
+                    osc.stop(time + 0.25);
+                } else if (type === 'shieldBlock') {
+                    // Metallic block
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(800, time);
+                    osc.frequency.exponentialRampToValueAtTime(400, time + 0.1);
+                    gainNode.gain.setValueAtTime(0.3, time); // LOUDER
+                    gainNode.gain.linearRampToValueAtTime(0, time + 0.2);
+                    osc.start(time);
+                    osc.stop(time + 0.2);
+                } else if (type === 'phase') {
+                    // Triumphant Sweep
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(300, time);
+                    osc.frequency.linearRampToValueAtTime(800, time + 0.6);
+                    gainNode.gain.setValueAtTime(0, time);
+                    gainNode.gain.linearRampToValueAtTime(0.3, time + 0.2); // LOUDER
+                    gainNode.gain.linearRampToValueAtTime(0, time + 0.8);
+                    osc.start(time);
+                    osc.stop(time + 0.8);
+                }
+            },
+            
+            playBgMusic: function() {
+                if (!this.isMusicOn) return;
+                this.stopMusic();
+                
+                // Fun, faster retro arpeggio 
+                const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 523.25, 392.00, 329.63]; 
+                let noteIndex = 0;
+                
+                this.musicInterval = setInterval(() => {
+                    if (audioCtx.state === 'suspended') return;
+                    const time = audioCtx.currentTime;
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    
+                    osc.type = 'square';
+                    osc.frequency.value = notes[noteIndex]; // Higher pitch for fun arcade feel
+                    
+                    gain.gain.setValueAtTime(0.06, time); // LOUDER (Was 0.02)
+                    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15); // Snappier
+                    
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    
+                    osc.start(time);
+                    osc.stop(time + 0.15);
+                    this.musicOscillators.push(osc);
+                    
+                    noteIndex = (noteIndex + 1) % notes.length;
+                    
+                    if(this.musicOscillators.length > 20) this.musicOscillators.shift();
+                }, 200); // Faster Tempo (Was 250)
+            },
+            
+            stopMusic: function() {
+                if (this.musicInterval) {
+                    clearInterval(this.musicInterval);
+                    this.musicInterval = null;
+                }
+                this.musicOscillators.forEach(osc => {
+                    try { osc.stop(); } catch(e){}
+                });
+                this.musicOscillators = [];
+            }
+        };
+
+        const LANE_WIDTH = 3.5; 
+        const BASE_SPEED = 45; 
+        const MAX_STAMINA = 100;
+        
+        let gameState = {
+            isPlaying: false,
+            isPaused: false,
+            score: 0,
+            coins: 0,
+            stamina: MAX_STAMINA,
+            distance: 0,
+            day: 1,
+            speedMultiplier: 1,
+            lane: 0, 
+            hasShield: false,
+            scoreMultiplier: 1,
+            currentTheme: 'school'
+        };
+
+        const PHASES = [
+            { name: "Menstrual Phase", days: [1, 5], color: 0xff9aa2, fog: 0xffe1e6, desc: "Rest! Dark Choco helps.", staminaDrain: 6, uiColor: "border-pink-400" },
+            { name: "Follicular Phase", days: [6, 13], color: 0xb5ead7, fog: 0xe8f7f2, desc: "Building energy! Faster now.", staminaDrain: 3, uiColor: "border-green-400" },
+            { name: "Ovulation Phase", days: [14, 16], color: 0xfff5ba, fog: 0xfffce6, desc: "Peak energy! Golden days!", staminaDrain: 2, uiColor: "border-yellow-400" },
+            { name: "Luteal Phase", days: [17, 28], color: 0xc7ceff, fog: 0xecefff, desc: "Obstacles increasing. Dodge!", staminaDrain: 5, uiColor: "border-indigo-400" }
+        ];
+
+        let currentPhaseIndex = 0;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(PHASES[0].fog);
+        scene.fog = new THREE.Fog(PHASES[0].fog, 20, 100);
+
+        const initialAspect = window.innerWidth / window.innerHeight;
+        const camera = new THREE.PerspectiveCamera(initialAspect < 1 ? 85 : 60, initialAspect, 0.1, 150);
+        camera.position.set(0, 6, 12);
+        camera.lookAt(0, 1.5, -15);
+
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('game-canvas'), antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(20, 40, 20);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        dirLight.shadow.camera.near = 0.5;
+        dirLight.shadow.camera.far = 100;
+        dirLight.shadow.camera.left = -20;
+        dirLight.shadow.camera.right = 20;
+        dirLight.shadow.camera.top = 20;
+        dirLight.shadow.camera.bottom = -20;
+        scene.add(dirLight);
+
+        const textureLoader = new THREE.TextureLoader();
+        const roadMat = new THREE.MeshStandardMaterial({ color: 0x333344, roughness: 0.8, metalness: 0.1 });
+        const groundGeo = new THREE.PlaneGeometry(60, 400, 1, 1);
+        const ground = new THREE.Mesh(groundGeo, roadMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.z = -150;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        const linesGroup = new THREE.Group();
+        scene.add(linesGroup);
+        const lineGeo = new THREE.PlaneGeometry(0.3, 400);
+        const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
+        for(let i=-1; i<=2; i++) {
+            const line = new THREE.Mesh(lineGeo, lineMat);
+            line.rotation.x = -Math.PI / 2;
+            line.position.x = (i - 0.5) * LANE_WIDTH;
+            line.position.y = 0.05;
+            line.position.z = -150;
+            linesGroup.add(line);
+        }
+
+        const sceneryGroup = new THREE.Group();
+        scene.add(sceneryGroup);
+        let environmentObjects = [];
+        
+        const treeGeo = new THREE.ConeGeometry(1.5, 4, 8);
+        const trunkGeo = new THREE.CylinderGeometry(0.3, 0.3, 1.5, 8);
+        const hutGeo = new THREE.BoxGeometry(4, 3, 4);
+        const roofGeo = new THREE.ConeGeometry(3.5, 2, 4);
+        const bldgGeo = new THREE.BoxGeometry(5, 15, 5);
+        const carGeo = new THREE.BoxGeometry(2, 1, 4);
+        const personGeo = new THREE.CylinderGeometry(0.4, 0.4, 1.5, 8); 
+
+        const matTree = new THREE.MeshStandardMaterial({ color: 0x228b22 });
+        const matTrunk = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+        const matHut = new THREE.MeshStandardMaterial({ color: 0xd2b48c });
+        const matRoof = new THREE.MeshStandardMaterial({ color: 0x8b0000 });
+        const matSchool = new THREE.MeshStandardMaterial({ color: 0xb22222 });
+        const matBldg = new THREE.MeshStandardMaterial({ color: 0x2f4f4f });
+        const matCar = new THREE.MeshStandardMaterial({ color: 0xffd700 });
+        const matPerson = new THREE.MeshStandardMaterial({ color: 0x1e90ff });
+
+        function createSceneryObject(theme, side, zPos) {
+            const objGroup = new THREE.Group();
+            const xOffset = side === 'left' ? -10 - Math.random()*15 : 10 + Math.random()*15;
+            let type = '';
+
+            if (theme === 'school') {
+                if (Math.random() < 0.3) {
+                    const bldg = new THREE.Mesh(bldgGeo, matSchool);
+                    bldg.position.y = 7.5; bldg.scale.set(1, 0.5 + Math.random(), 1); bldg.castShadow = true;
+                    objGroup.add(bldg); type = 'static';
+                } else if (Math.random() < 0.6) {
+                    const tree = new THREE.Mesh(treeGeo, matTree); tree.position.y = 3;
+                    const trunk = new THREE.Mesh(trunkGeo, matTrunk); trunk.position.y = 0.75;
+                    tree.castShadow = true; trunk.castShadow = true;
+                    objGroup.add(tree); objGroup.add(trunk); type = 'static';
+                } else {
+                    const child = new THREE.Mesh(personGeo, matPerson); child.position.y = 0.75; child.scale.set(0.6, 0.6, 0.6); child.castShadow = true;
+                    objGroup.add(child); type = 'bounce';
+                }
+            } else if (theme === 'village') {
+                if (Math.random() < 0.4) {
+                    const hut = new THREE.Mesh(hutGeo, matHut); hut.position.y = 1.5;
+                    const roof = new THREE.Mesh(roofGeo, matRoof); roof.position.y = 4; roof.rotation.y = Math.PI/4;
+                    hut.castShadow = true; roof.castShadow = true;
+                    objGroup.add(hut); objGroup.add(roof); type = 'static';
+                } else if (Math.random() < 0.7) {
+                    const tree = new THREE.Mesh(treeGeo, matTree); tree.position.y = 3;
+                    const trunk = new THREE.Mesh(trunkGeo, matTrunk); trunk.position.y = 0.75;
+                    tree.castShadow = true; trunk.castShadow = true;
+                    objGroup.add(tree); objGroup.add(trunk); type = 'static';
+                } else {
+                    const farmer = new THREE.Mesh(personGeo, matPerson); farmer.material = new THREE.MeshStandardMaterial({color: 0x8b4513}); farmer.position.y = 0.75; farmer.castShadow = true;
+                    objGroup.add(farmer); type = 'walk';
+                }
+            } else if (theme === 'city') {
+                if (Math.random() < 0.6) {
+                    const bldg = new THREE.Mesh(bldgGeo, matBldg); bldg.position.y = 7.5; bldg.scale.set(1, 1 + Math.random()*2, 1); bldg.castShadow = true;
+                    objGroup.add(bldg); type = 'static';
+                } else {
+                    const car = new THREE.Mesh(carGeo, matCar); car.material = new THREE.MeshStandardMaterial({color: Math.random() * 0xffffff}); car.position.y = 0.5; car.castShadow = true;
+                    objGroup.add(car); type = 'drive';
+                }
+            }
+
+            objGroup.position.set(xOffset, 0, zPos);
+            sceneryGroup.add(objGroup);
+            environmentObjects.push({ mesh: objGroup, type: type, originalY: objGroup.position.y, time: Math.random()*10 });
+        }
+
+        function populateScenery(theme) {
+            environmentObjects.forEach(obj => sceneryGroup.remove(obj.mesh));
+            environmentObjects = [];
+            for (let z = -150; z < 20; z += 15) {
+                createSceneryObject(theme, 'left', z);
+                createSceneryObject(theme, 'right', z);
+            }
+        }
+        populateScenery(gameState.currentTheme);
+
+        const playerGroup = new THREE.Group();
+        scene.add(playerGroup);
+
+        const skinMat = new THREE.MeshStandardMaterial({ color: 0xc58c85, roughness: 0.6 }); 
+        const topMat = new THREE.MeshStandardMaterial({ color: 0xff4081, roughness: 0.7 }); 
+        const bottomMat = new THREE.MeshStandardMaterial({ color: 0x1a237e, roughness: 0.8 }); 
+        const shoeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+        const hairMat = new THREE.MeshStandardMaterial({ color: 0x2c1b18, roughness: 0.9 });
+
+        const hips = new THREE.Group(); hips.position.y = 1.0; playerGroup.add(hips);
+        const torsoGeo = new THREE.CylinderGeometry(0.25, 0.3, 0.6, 12);
+        const torso = new THREE.Mesh(torsoGeo, topMat);
+        torso.position.y = 0.3; torso.castShadow = true; hips.add(torso);
+
+        const headGeo = new THREE.SphereGeometry(0.22, 16, 16);
+        const head = new THREE.Mesh(headGeo, skinMat);
+        head.position.y = 0.7; head.castShadow = true; hips.add(head);
+
+        const hairBaseGeo = new THREE.SphereGeometry(0.23, 16, 16, 0, Math.PI * 2, 0, Math.PI / 1.8);
+        const hairBase = new THREE.Mesh(hairBaseGeo, hairMat);
+        hairBase.position.y = 0.71; hairBase.rotation.x = Math.PI; hips.add(hairBase);
+        
+        const tailGeo = new THREE.ConeGeometry(0.1, 0.4, 8);
+        const ponytail = new THREE.Mesh(tailGeo, hairMat);
+        ponytail.position.set(0, 0.8, -0.2); ponytail.rotation.x = -Math.PI / 4; ponytail.castShadow = true; hips.add(ponytail);
+
+        const limbGeo = new THREE.CylinderGeometry(0.08, 0.06, 0.4, 8);
+        
+        const leftShoulder = new THREE.Group(); leftShoulder.position.set(-0.35, 0.5, 0); hips.add(leftShoulder);
+        const leftUpperArm = new THREE.Mesh(limbGeo, skinMat); leftUpperArm.position.y = -0.2; leftUpperArm.castShadow = true; leftShoulder.add(leftUpperArm);
+        const leftElbow = new THREE.Group(); leftElbow.position.y = -0.4; leftShoulder.add(leftElbow);
+        const leftLowerArm = new THREE.Mesh(limbGeo, skinMat); leftLowerArm.position.y = -0.2; leftLowerArm.castShadow = true; leftElbow.add(leftLowerArm);
+
+        const rightShoulder = new THREE.Group(); rightShoulder.position.set(0.35, 0.5, 0); hips.add(rightShoulder);
+        const rightUpperArm = new THREE.Mesh(limbGeo, skinMat); rightUpperArm.position.y = -0.2; rightUpperArm.castShadow = true; rightShoulder.add(rightUpperArm);
+        const rightElbow = new THREE.Group(); rightElbow.position.y = -0.4; rightShoulder.add(rightElbow);
+        const rightLowerArm = new THREE.Mesh(limbGeo, skinMat); rightLowerArm.position.y = -0.2; rightLowerArm.castShadow = true; rightElbow.add(rightLowerArm);
+
+        const legUpperGeo = new THREE.CylinderGeometry(0.12, 0.09, 0.5, 8);
+        const legLowerGeo = new THREE.CylinderGeometry(0.09, 0.07, 0.5, 8);
+        const shoeGeo = new THREE.BoxGeometry(0.15, 0.1, 0.25);
+
+        const leftHipJoint = new THREE.Group(); leftHipJoint.position.set(-0.15, -0.1, 0); hips.add(leftHipJoint);
+        const leftThigh = new THREE.Mesh(legUpperGeo, bottomMat); leftThigh.position.y = -0.25; leftThigh.castShadow = true; leftHipJoint.add(leftThigh);
+        const leftKnee = new THREE.Group(); leftKnee.position.y = -0.5; leftHipJoint.add(leftKnee);
+        const leftCalf = new THREE.Mesh(legLowerGeo, skinMat); leftCalf.position.y = -0.25; leftCalf.castShadow = true; leftKnee.add(leftCalf);
+        const leftShoe = new THREE.Mesh(shoeGeo, shoeMat); leftShoe.position.set(0, -0.55, 0.05); leftShoe.castShadow = true; leftKnee.add(leftShoe);
+
+        const rightHipJoint = new THREE.Group(); rightHipJoint.position.set(0.15, -0.1, 0); hips.add(rightHipJoint);
+        const rightThigh = new THREE.Mesh(legUpperGeo, bottomMat); rightThigh.position.y = -0.25; rightThigh.castShadow = true; rightHipJoint.add(rightThigh);
+        const rightKnee = new THREE.Group(); rightKnee.position.y = -0.5; rightHipJoint.add(rightKnee);
+        const rightCalf = new THREE.Mesh(legLowerGeo, skinMat); rightCalf.position.y = -0.25; rightCalf.castShadow = true; rightKnee.add(rightCalf);
+        const rightShoe = new THREE.Mesh(shoeGeo, shoeMat); rightShoe.position.set(0, -0.55, 0.05); rightShoe.castShadow = true; rightKnee.add(rightShoe);
+
+        const shieldGeo = new THREE.SphereGeometry(1.2, 32, 32);
+        const shieldMat = new THREE.MeshPhongMaterial({ color: 0xffaa00, transparent: true, opacity: 0.3, shininess: 100, emissive: 0xffaa00, emissiveIntensity: 0.2, side: THREE.DoubleSide });
+        const shieldMesh = new THREE.Mesh(shieldGeo, shieldMat);
+        shieldMesh.position.y = 1.0; shieldMesh.visible = false; playerGroup.add(shieldMesh);
+
+        let playerVars = { targetX: 0, yVelocity: 0, isJumping: false, isSliding: false, slideTimer: 0, gravity: -50, jumpStrength: 18, runCycle: 0 };
+
+        function togglePause() {
+            audio.uiClick();
+            if (!gameState.isPlaying) return;
+            gameState.isPaused = !gameState.isPaused;
+            if (gameState.isPaused) {
+                document.getElementById('pause-screen').classList.remove('hidden');
+                document.getElementById('pause-screen').classList.add('flex');
+                audio.stopMusic();
+            } else {
+                document.getElementById('pause-screen').classList.add('hidden');
+                document.getElementById('pause-screen').classList.remove('flex');
+                audio.playBgMusic();
+                clock.getDelta(); 
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (!gameState.isPlaying) return;
+            if (e.code === 'Escape' || e.code === 'KeyP' || e.key === 'Escape' || e.key === 'p' || e.key === 'P') { togglePause(); return; }
+            if (gameState.isPaused) return;
+
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA' || e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { if(gameState.lane > -1) gameState.lane--; }
+            if (e.code === 'ArrowRight' || e.code === 'KeyD' || e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { if(gameState.lane < 1) gameState.lane++; }
+            if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') jump();
+            if (e.code === 'ArrowDown' || e.code === 'KeyS' || e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') slide();
+        });
+
+        let startX = 0, startY = 0;
+        let isDragging = false;
+        
+        function handleDragStart(x, y) {
+            if(!gameState.isPlaying || gameState.isPaused) return;
+            startX = x; startY = y; isDragging = true;
+        }
+        
+        function handleDragEnd(x, y) {
+            if(!isDragging || !gameState.isPlaying || gameState.isPaused) return;
+            isDragging = false;
+            const dx = x - startX;
+            const dy = y - startY;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                if (Math.abs(dx) > 30) {
+                    if (dx > 0 && gameState.lane < 1) gameState.lane++;
+                    else if (dx < 0 && gameState.lane > -1) gameState.lane--;
+                }
+            } else {
+                if (Math.abs(dy) > 30) {
+                    if (dy < 0) jump();
+                    else slide();
+                }
+            }
+        }
+
+        document.addEventListener('touchstart', e => {
+            if(e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
+            handleDragStart(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+        }, {passive: false});
+        
+        document.addEventListener('touchmove', e => { 
+            if(gameState.isPlaying) e.preventDefault(); 
+        }, {passive: false});
+        
+        document.addEventListener('touchend', e => {
+            if(e.changedTouches.length > 0) handleDragEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+        });
+        
+        document.addEventListener('mousedown', e => {
+            if(e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return; 
+            handleDragStart(e.clientX, e.clientY);
+        });
+        document.addEventListener('mouseup', e => { handleDragEnd(e.clientX, e.clientY); });
+
+
+        function jump() {
+            if (!playerVars.isJumping && !playerVars.isSliding) {
+                playerVars.yVelocity = playerVars.jumpStrength; playerVars.isJumping = true; audio.play('jump');
+            }
+        }
+        function slide() {
+            if (!playerVars.isJumping && !playerVars.isSliding) {
+                playerVars.isSliding = true; playerVars.slideTimer = 0.8; audio.play('slide');
+            }
+        }
+
+        const activeObjects = [];
+        let spawnTimer = 0;
+
+        function createFlatSpriteIcon(emoji, scale=1.2) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.font = '90px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(emoji, 64, 64);
+            const texture = new THREE.CanvasTexture(canvas);
+            const mat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+            const sprite = new THREE.Sprite(mat);
+            sprite.scale.set(scale, scale, 1);
+            
+            const shadowGeo = new THREE.PlaneGeometry(0.8, 0.8);
+            const shadowMat = new THREE.MeshBasicMaterial({color: 0x000000, transparent: true, opacity: 0.3});
+            const shadow = new THREE.Mesh(shadowGeo, shadowMat);
+            shadow.rotation.x = -Math.PI/2;
+            shadow.position.y = -0.5;
+            
+            const group = new THREE.Group();
+            group.add(sprite); group.add(shadow);
+            return group;
+        }
+
+        const matMonster = new THREE.MeshStandardMaterial({ color: 0x4a0e4a, roughness: 0.9, metalness: 0.2 });
+        const matBoulder = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 1.0 });
+
+        function spawnObject() {
+            const lane = Math.floor(Math.random() * 3) - 1; 
+            const xPos = lane * LANE_WIDTH; const zPos = -80;
+
+            const rand = Math.random();
+            let type, mesh, isObstacle = false, requiresAction = null;
+
+            if (rand < 0.2) { type = 'coin'; mesh = createFlatSpriteIcon('🌸'); mesh.position.set(xPos, 0.8, zPos); }
+            else if (rand < 0.3) { type = 'water'; mesh = createFlatSpriteIcon('💧'); mesh.position.set(xPos, 0.8, zPos); }
+            else if (rand < 0.4) { type = 'spinach'; mesh = createFlatSpriteIcon('🍫'); mesh.position.set(xPos, 0.8, zPos); }
+            else if (rand < 0.45) { type = 'pad'; mesh = createFlatSpriteIcon('♨️'); mesh.position.set(xPos, 0.8, zPos); }
+            else if (rand < 0.70) {
+                type = 'monster'; isObstacle = true; requiresAction = 'jump';
+                mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7, 1), matMonster); mesh.castShadow = true;
+                const posAttr = mesh.geometry.attributes.position;
+                for(let i=0; i<posAttr.count; i++) { if(i%3===0) posAttr.setXYZ(i, posAttr.getX(i)*1.4, posAttr.getY(i)*1.4, posAttr.getZ(i)*1.4); }
+                mesh.geometry.computeVertexNormals(); mesh.position.set(xPos, 0.5, zPos);
+            } else if (rand < 0.90) {
+                type = 'boulder'; isObstacle = true; requiresAction = 'slide';
+                mesh = new THREE.Mesh(new THREE.DodecahedronGeometry(1.1, 0), matBoulder); mesh.castShadow = true;
+                mesh.position.set(xPos, 1.6, zPos);
+            } else {
+                spawnMythWall(zPos); return;
+            }
+            scene.add(mesh); activeObjects.push({ mesh, type, isObstacle, requiresAction, active: true });
+        }
+
+        const matFact = new THREE.MeshPhongMaterial({ color: 0x00ff00, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
+        const matMyth = new THREE.MeshPhongMaterial({ color: 0xff0000, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
+
+        function spawnMythWall(zPos) {
+            const correctLane = Math.floor(Math.random() * 3) - 1;
+            
+            for(let i = -1; i <= 1; i++) {
+                const isCorrect = (i === correctLane);
+                const group = new THREE.Group();
+                const geo = new THREE.BoxGeometry(LANE_WIDTH * 0.95, 4, 0.2);
+                const mat = isCorrect ? matFact : matMyth;
+                const wall = new THREE.Mesh(geo, mat);
+                wall.position.y = 2; wall.castShadow = true; group.add(wall);
+
+                const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 128;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = isCorrect ? '#00ff00' : '#ff0000';
+                ctx.font = 'bold 40px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(isCorrect ? "FACT ✓" : "MYTH ✗", 128, 64);
+                const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true }));
+                sprite.scale.set(LANE_WIDTH*0.8, LANE_WIDTH*0.4, 1);
+                sprite.position.set(0, 2, 0.2); group.add(sprite);
+                
+                group.position.set(i * LANE_WIDTH, 0, zPos);
+                scene.add(group);
+                activeObjects.push({ mesh: group, type: isCorrect ? 'fact_gate' : 'myth_wall', isObstacle: !isCorrect, requiresAction: null, active: true });
+            }
+        }
+
+        function updateUI() {
+            if(!document.getElementById('toggle-ui').checked) return;
+            const stamPercent = Math.max(0, Math.min(100, (gameState.stamina / MAX_STAMINA) * 100));
+            document.getElementById('stamina-bar').style.width = stamPercent + '%';
+            document.getElementById('stamina-bar').style.background = stamPercent < 25 ? '#ff0000' : 'linear-gradient(90deg, #ff4d4d, #4ade80)';
+            document.getElementById('score-counter').innerText = Math.floor(gameState.score);
+            document.getElementById('coin-counter').innerText = gameState.coins;
+            document.getElementById('day-counter').innerText = gameState.day;
+            shieldMesh.visible = gameState.hasShield;
+            if(gameState.hasShield) document.getElementById('active-powerup').classList.remove('hidden');
+            else document.getElementById('active-powerup').classList.add('hidden');
+        }
+
+        function showFloatingText(text, color, x, y) {
+            const el = document.createElement('div'); el.className = 'floating-text'; el.style.color = color; el.innerHTML = text;
+            const vector = new THREE.Vector3(x, y, 0); vector.project(camera);
+            el.style.left = `${(vector.x * .5 + .5) * window.innerWidth}px`; el.style.top = `${(-(vector.y * .5) + .5) * window.innerHeight}px`;
+            document.body.appendChild(el); setTimeout(() => { document.body.removeChild(el); }, 1000);
+        }
+
+        function checkPhaseTransition() {
+            let newPhaseIdx = 0; const cycleDay = ((gameState.day - 1) % 28) + 1;
+            if (cycleDay <= 5) newPhaseIdx = 0; else if (cycleDay <= 13) newPhaseIdx = 1; else if (cycleDay <= 16) newPhaseIdx = 2; else newPhaseIdx = 3;
+
+            if (newPhaseIdx !== currentPhaseIndex) {
+                currentPhaseIndex = newPhaseIdx; const phase = PHASES[currentPhaseIndex];
+                scene.background.setHex(phase.fog); scene.fog.color.setHex(phase.fog);
+                
+                if(gameState.currentTheme === 'village') roadMat.color.setHex(0x5c4033);
+                else roadMat.color.setHex(0x333344);
+
+                document.getElementById('phase-name').innerText = phase.name;
+                if(gameState.day > 1) audio.play('phase');
+
+                const alertBox = document.getElementById('phase-alert-container');
+                document.getElementById('phase-alert-title').innerText = phase.name; document.getElementById('phase-alert-desc').innerText = phase.desc;
+                document.getElementById('phase-alert-box').className = `glass-panel px-6 py-4 rounded-3xl text-white text-center border-t-4 shadow-2xl ${phase.uiColor}`;
+                alertBox.classList.remove('hidden', 'phase-alert'); void alertBox.offsetWidth; alertBox.classList.add('phase-alert');
+            }
+        }
+
+        function handleCollision(obj) {
+            if (!obj.active) return;
+            obj.active = false; scene.remove(obj.mesh);
+            const isMenstrual = (currentPhaseIndex === 0);
+
+            if(['monster','boulder','myth_wall'].includes(obj.type)) {
+                if (gameState.hasShield) {
+                    gameState.hasShield = false; audio.play('shieldBlock'); showFloatingText("Blocked! 🛡️", "#ffffff", playerGroup.position.x, playerGroup.position.y + 2);
+                } else {
+                    gameState.stamina -= 30; audio.play('hit'); showFloatingText("Ouch! -30 ❤️", "#ff0000", playerGroup.position.x, playerGroup.position.y + 2);
+                    topMat.color.setHex(0xff0000); setTimeout(() => { if(gameState.isPlaying) topMat.color.setHex(0xff4081); }, 300);
+                }
+            } else {
+                if (obj.type === 'coin') { gameState.coins++; gameState.score += 100 * gameState.scoreMultiplier; audio.play('coin'); showFloatingText("+100 🌸", "#ff69b4", playerGroup.position.x, playerGroup.position.y + 2); }
+                if (obj.type === 'water') { gameState.stamina = Math.min(MAX_STAMINA, gameState.stamina + 15); audio.play('powerup'); showFloatingText("+Stamina 💧", "#00aaff", playerGroup.position.x, playerGroup.position.y + 2); }
+                if (obj.type === 'spinach') { gameState.stamina = Math.min(MAX_STAMINA, gameState.stamina + (isMenstrual ? 30 : 20)); audio.play('powerup'); showFloatingText(isMenstrual ? "Craving Fixed! +🍫" : "+Stamina 🍫", "#8b4513", playerGroup.position.x, playerGroup.position.y + 2); }
+                if (obj.type === 'pad') { gameState.hasShield = true; audio.play('powerup'); showFloatingText("Shield Active! ♨️", "#ffaa00", playerGroup.position.x, playerGroup.position.y + 2); }
+                if (obj.type === 'fact_gate') { gameState.score += 300 * gameState.scoreMultiplier; gameState.stamina = Math.min(MAX_STAMINA, gameState.stamina + 10); audio.play('powerup'); showFloatingText("Fact! +300 ✓", "#00ff00", playerGroup.position.x, playerGroup.position.y + 3); }
+            }
+            updateUI();
+        }
+
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (!gameState.isPlaying || gameState.isPaused) { renderer.render(scene, camera); return; }
+
+            const dt = clock.getDelta();
+            
+            playerVars.targetX = gameState.lane * LANE_WIDTH;
+            playerGroup.position.x += (playerVars.targetX - playerGroup.position.x) * 12 * dt;
+
+            playerVars.runCycle += dt * 15 * gameState.speedMultiplier;
+            const cycle = playerVars.runCycle;
+
+            if (playerVars.isJumping) {
+                playerVars.yVelocity += playerVars.gravity * dt;
+                playerGroup.position.y += playerVars.yVelocity * dt;
+                
+                hips.rotation.x = 0; leftThigh.rotation.x = -Math.PI/3; rightThigh.rotation.x = 0; leftKnee.rotation.x = Math.PI/2; rightKnee.rotation.x = 0;
+                leftShoulder.rotation.x = -Math.PI/4; rightShoulder.rotation.x = Math.PI/4; leftElbow.rotation.x = -Math.PI/2; rightElbow.rotation.x = -Math.PI/2;
+
+                if (playerGroup.position.y <= 0) {
+                    playerGroup.position.y = 0; playerVars.isJumping = false; playerVars.yVelocity = 0;
+                }
+            } else if (playerVars.isSliding) {
+                playerVars.slideTimer -= dt;
+                
+                hips.position.y = 0.4; hips.rotation.x = -Math.PI/3;
+                leftThigh.rotation.x = -Math.PI/2; rightThigh.rotation.x = -Math.PI/2; leftKnee.rotation.x = Math.PI/1.5; rightKnee.rotation.x = Math.PI/1.5;
+                leftShoulder.rotation.x = -Math.PI/2; rightShoulder.rotation.x = -Math.PI/2;
+
+                if (playerVars.slideTimer <= 0) { 
+                    playerVars.isSliding = false; 
+                    hips.position.y = 1.0; 
+                    hips.rotation.x = 0; 
+                }
+            } else {
+                hips.position.y = 1.0 + Math.sin(cycle * 2) * 0.05;
+                hips.rotation.y = Math.sin(cycle) * 0.1;
+                torso.rotation.y = -Math.sin(cycle) * 0.1;
+                
+                leftThigh.rotation.x = Math.sin(cycle) * 0.8;
+                leftKnee.rotation.x = Math.max(0, -Math.sin(cycle + 1) * 1.5);
+                rightThigh.rotation.x = Math.sin(cycle + Math.PI) * 0.8;
+                rightKnee.rotation.x = Math.max(0, -Math.sin(cycle + Math.PI + 1) * 1.5);
+
+                leftShoulder.rotation.x = Math.sin(cycle + Math.PI) * 0.5; leftElbow.rotation.x = -Math.PI/2 - Math.sin(cycle)*0.2;
+                rightShoulder.rotation.x = Math.sin(cycle) * 0.5; rightElbow.rotation.x = -Math.PI/2 + Math.sin(cycle)*0.2;
+                
+                ponytail.rotation.x = -Math.PI/4 + Math.sin(cycle*2) * 0.2;
+            }
+
+            const speed = BASE_SPEED * gameState.speedMultiplier;
+            const distanceTraveled = speed * dt;
+            gameState.distance += distanceTraveled;
+            gameState.score += distanceTraveled * 1.5 * gameState.scoreMultiplier;
+
+            const newDay = Math.floor(gameState.distance / 150) + 1; 
+            if (newDay !== gameState.day) {
+                gameState.day = newDay; checkPhaseTransition();
+                gameState.speedMultiplier = Math.min(3.5, 1 + (gameState.day * 0.08));
+            }
+
+            gameState.stamina -= PHASES[currentPhaseIndex].staminaDrain * dt;
+            if (gameState.stamina <= 0) gameOver();
+
+            linesGroup.position.z += speed * dt;
+            if(linesGroup.position.z > 0) linesGroup.position.z -= 10;
+            
+            sceneryGroup.children.forEach(objGrp => {
+                objGrp.position.z += speed * dt;
+                if(objGrp.position.z > 20) {
+                    objGrp.position.z -= 170; 
+                    const side = objGrp.position.x < 0 ? 'left' : 'right';
+                    objGrp.position.x = side === 'left' ? -10 - Math.random()*15 : 10 + Math.random()*15;
+                }
+                
+                const data = environmentObjects.find(e => e.mesh === objGrp);
+                if(data) {
+                    data.time += dt * 5;
+                    if(data.type === 'bounce') objGrp.position.y = data.originalY + Math.abs(Math.sin(data.time))*0.5;
+                    if(data.type === 'walk') {
+                        objGrp.rotation.y = Math.sin(data.time*0.5)*0.2;
+                        objGrp.position.x += Math.sin(data.time)*0.02;
+                    }
+                    if(data.type === 'drive') objGrp.position.z += 10 * dt; 
+                }
+            });
+
+            spawnTimer -= dt;
+            if (spawnTimer <= 0) {
+                spawnObject();
+                const currentCycleDay = ((gameState.day - 1) % 28) + 1;
+                let spawnRate = 0.7;
+                if(currentCycleDay > 8) spawnRate = 0.5;
+                if(currentCycleDay > 16) spawnRate = 0.35;
+                spawnTimer = spawnRate / gameState.speedMultiplier + Math.random() * 0.3;
+            }
+
+            for (let i = activeObjects.length - 1; i >= 0; i--) {
+                const obj = activeObjects[i];
+                if (!obj.active) continue;
+
+                obj.mesh.position.z += speed * dt;
+                
+                if (['coin', 'water', 'spinach', 'pad'].includes(obj.type)) {
+                    const group = obj.mesh;
+                    group.children[0].position.y = 0.5 + Math.sin(clock.elapsedTime * 3 + i) * 0.2; 
+                }
+                if (obj.type === 'monster') obj.mesh.rotation.x += 4 * dt;
+                if (obj.type === 'boulder') obj.mesh.rotation.z -= 2 * dt;
+
+                if (obj.mesh.position.z > -1.5 && obj.mesh.position.z < 1.5) {
+                    if (Math.abs(playerGroup.position.x - obj.mesh.position.x) < 1.2) {
+                        let hit = false;
+                        if (obj.requiresAction === 'jump') { if (playerGroup.position.y < 1.2) hit = true; }
+                        else if (obj.requiresAction === 'slide') { if (!playerVars.isSliding) hit = true; }
+                        else hit = true;
+
+                        if (hit) handleCollision(obj);
+                    }
+                }
+                if (obj.mesh.position.z > 8) { scene.remove(obj.mesh); activeObjects.splice(i, 1); }
+            }
+
+            updateUI(); renderer.render(scene, camera);
+        }
+
+        function startGame() {
+            audio.uiClick();
+            document.getElementById('main-menu').classList.add('hidden');
+            if(document.getElementById('toggle-ui').checked) document.getElementById('hud').classList.remove('hidden');
+            document.getElementById('hud').classList.add('flex');
+            document.getElementById('game-over').classList.add('hidden');
+            document.getElementById('theme-selection-container').classList.add('hidden');
+
+            gameState = {
+                isPlaying: true, isPaused: false, score: 0, coins: 0, stamina: MAX_STAMINA,
+                distance: 0, day: 1, speedMultiplier: 1, lane: 0, hasShield: false, scoreMultiplier: 1,
+                currentTheme: document.getElementById('theme-selector').value
+            };
+            currentPhaseIndex = -1; checkPhaseTransition();
+            populateScenery(gameState.currentTheme);
+            
+            playerGroup.position.set(0, 0, 0); topMat.color.setHex(0xff4081);
+            playerVars.isJumping = false; playerVars.isSliding = false;
+            
+            activeObjects.forEach(obj => scene.remove(obj.mesh)); activeObjects.length = 0;
+            
+            document.getElementById('game-canvas').focus();
+            
+            audio.playBgMusic(); clock.start();
+        }
+
+        function gameOver() {
+            gameState.isPlaying = false;
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('hud').classList.remove('flex');
+            document.getElementById('game-over').classList.remove('hidden');
+            document.getElementById('game-over').classList.add('flex');
+            document.getElementById('theme-selection-container').classList.remove('hidden'); 
+
+            document.getElementById('final-score').innerText = Math.floor(gameState.score);
+            document.getElementById('final-days').innerText = gameState.day;
+            document.getElementById('final-coins').innerText = gameState.coins;
+            
+            audio.stopMusic(); audio.play('hit');
+        }
+
+        function bindButton(id, callback) {
+            const btn = document.getElementById(id);
+            if(btn) {
+                btn.addEventListener('touchstart', (e) => { e.preventDefault(); callback(); }, {passive:false});
+                btn.addEventListener('mousedown', (e) => { e.preventDefault(); callback(); });
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            const aspect = window.innerWidth / window.innerHeight;
+            camera.aspect = aspect;
+            camera.fov = aspect < 1 ? 85 : 60; 
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        bindButton('start-btn', startGame);
+        bindButton('restart-btn', startGame);
+        bindButton('pause-btn', togglePause);
+        bindButton('resume-btn', togglePause);
+        
+        bindButton('quit-btn', () => {
+            audio.uiClick();
+            document.getElementById('pause-screen').classList.add('hidden');
+            document.getElementById('pause-screen').classList.remove('flex');
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('main-menu').classList.remove('hidden');
+            document.getElementById('theme-selection-container').classList.remove('hidden');
+            gameState.isPlaying = false; gameState.isPaused = false;
+            audio.stopMusic();
+        });
+
+        bindButton('settings-btn', () => {
+            audio.uiClick();
+            document.getElementById('settings-screen').classList.remove('hidden');
+            document.getElementById('settings-screen').classList.add('flex');
+        });
+        bindButton('settings-menu-btn', () => {
+            audio.uiClick();
+            if (gameState.isPlaying && !gameState.isPaused) togglePause(); 
+            document.getElementById('pause-screen').classList.add('hidden');
+            document.getElementById('pause-screen').classList.remove('flex');
+            document.getElementById('settings-screen').classList.remove('hidden');
+            document.getElementById('settings-screen').classList.add('flex');
+        });
+        bindButton('close-settings-btn', () => {
+            audio.uiClick();
+            document.getElementById('settings-screen').classList.add('hidden');
+            document.getElementById('settings-screen').classList.remove('flex');
+            
+            if (gameState.isPlaying && gameState.isPaused) {
+                document.getElementById('pause-screen').classList.remove('hidden');
+                document.getElementById('pause-screen').classList.add('flex');
+            }
+
+            audio.isMusicOn = document.getElementById('toggle-music').checked;
+            audio.isSfxOn = document.getElementById('toggle-sfx').checked;
+            if(!audio.isMusicOn) audio.stopMusic();
+            else if (gameState.isPlaying && !gameState.isPaused) audio.playBgMusic();
+            
+            if(!document.getElementById('toggle-ui').checked) document.getElementById('hud').classList.add('hidden');
+            else if(gameState.isPlaying) document.getElementById('hud').classList.remove('hidden');
+            
+            if(!gameState.isPlaying) {
+                gameState.currentTheme = document.getElementById('theme-selector').value;
+                populateScenery(gameState.currentTheme);
+            }
+        });
+        
+        bindButton('mute-btn', () => {
+            audio.uiClick();
+            const icon = document.getElementById('mute-icon');
+            if (audio.isMusicOn || audio.isSfxOn) {
+                audio.isMusicOn = false; audio.isSfxOn = false;
+                document.getElementById('toggle-music').checked = false;
+                document.getElementById('toggle-sfx').checked = false;
+                icon.classList.replace('fa-volume-up', 'fa-volume-mute');
+                audio.stopMusic();
+            } else {
+                audio.isMusicOn = true; audio.isSfxOn = true;
+                document.getElementById('toggle-music').checked = true;
+                document.getElementById('toggle-sfx').checked = true;
+                icon.classList.replace('fa-volume-mute', 'fa-volume-up');
+                if (gameState.isPlaying && !gameState.isPaused) audio.playBgMusic();
+            }
+        });
+
+        ['toggle-music', 'toggle-sfx', 'toggle-ui', 'theme-selector'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.addEventListener('change', () => audio.uiClick());
+        });
+
+        renderer.render(scene, camera);
+        animate();
+
+    </script>
+</body>
+</html>

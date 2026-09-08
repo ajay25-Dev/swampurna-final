@@ -155,6 +155,15 @@ function impactStorySubmissionsSetupError() {
   };
 }
 
+function isMissingActivityEventsTable(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    error?.code === "PGRST205" ||
+    error?.code === "42P01" ||
+    (message.includes("app_activity_events") && message.includes("schema cache"))
+  );
+}
+
 function normalizeSelectedDates(selectedDates = []) {
   return [...new Set((selectedDates || []).filter((d) => isIsoDate(d)).map((d) => String(d)))].sort();
 }
@@ -3810,6 +3819,50 @@ app.post("/api/v1/support/reports", apiAuthRequired, upload.single("file"), asyn
   return res.json({ data });
 });
 
+const ACTIVITY_FEATURES = [
+  "period_tracker",
+  "cycle_snaps",
+  "chatbot",
+  "education_material",
+  "games",
+  "gallery",
+  "community_posts",
+  "support",
+  "testimonials",
+  "notifications",
+  "other",
+];
+
+app.post("/api/v1/activity/track", apiAuthRequired, async (req, res) => {
+  const feature = String(req.body?.feature || "").trim().toLowerCase();
+  const eventType = String(req.body?.event_type || "view").trim().toLowerCase();
+  const meta = req.body?.meta && typeof req.body.meta === "object" ? req.body.meta : null;
+
+  if (!feature) {
+    return res.status(400).json({ error: "feature is required" });
+  }
+
+  const { data, error } = await supabase
+    .from("app_activity_events")
+    .insert({
+      user_id: req.user.id,
+      feature,
+      event_type: eventType,
+      meta,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    if (isMissingActivityEventsTable(error)) {
+      // Table not provisioned yet — accept silently so the client never has to handle this.
+      return res.json({ data: null, tracked: false });
+    }
+    return res.status(400).json({ error: error.message });
+  }
+  return res.json({ data, tracked: true });
+});
+
 app.get("/api/v1/support/reports/my", apiAuthRequired, async (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
   const offset = Math.max(Number(req.query.offset) || 0, 0);
@@ -4232,6 +4285,113 @@ app.post("/api/customers", authRequired, async (req, res) => {
   return res.json({ data: { ...data, users: { email: createdUser.email, role: createdUser.role, is_active: createdUser.is_active } } });
 });
 
+app.put("/api/customers/:id", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const { name, email, password, phone, status, notes, is_active } = req.body || {};
+
+  const { data: existingCustomer, error: existingCustomerError } = await supabase
+    .from("customers")
+    .select("id, user_id")
+    .eq("id", id)
+    .single();
+
+  if (existingCustomerError || !existingCustomer) {
+    return res.status(404).json({ error: "Customer not found" });
+  }
+
+  const customerUpdates = {};
+  if (name !== undefined) customerUpdates.name = String(name).trim();
+  if (phone !== undefined) customerUpdates.phone = phone ? String(phone).trim() : null;
+  if (status !== undefined) customerUpdates.status = status ? String(status).trim() : "new";
+  if (notes !== undefined) customerUpdates.notes = notes ? String(notes).trim() : null;
+
+  if (Object.keys(customerUpdates).length > 0) {
+    const { error: updateCustomerError } = await supabase
+      .from("customers")
+      .update(customerUpdates)
+      .eq("id", id);
+    if (updateCustomerError) {
+      return res.status(400).json({ error: updateCustomerError.message });
+    }
+  }
+
+  const userUpdates = {};
+  if (typeof is_active === "boolean") userUpdates.is_active = is_active;
+  if (email !== undefined && String(email).trim()) {
+    const cleanEmail = String(email).trim().toLowerCase();
+    const { data: emailOwner, error: emailOwnerError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", cleanEmail)
+      .single();
+    if (emailOwnerError && emailOwnerError.code !== "PGRST116") {
+      return res.status(400).json({ error: emailOwnerError.message });
+    }
+    if (emailOwner && emailOwner.id !== existingCustomer.user_id) {
+      return res.status(400).json({ error: "Email already exists in users" });
+    }
+    userUpdates.email = cleanEmail;
+  }
+  if (password) {
+    userUpdates.password_hash = await bcrypt.hash(String(password), 10);
+  }
+
+  if (Object.keys(userUpdates).length > 0) {
+    const { error: updateUserError } = await supabase
+      .from("users")
+      .update(userUpdates)
+      .eq("id", existingCustomer.user_id);
+    if (updateUserError) {
+      return res.status(400).json({ error: updateUserError.message });
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("customers")
+    .select("*, users:user_id (email, role, is_active)")
+    .eq("id", id)
+    .single();
+
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to load updated customer" });
+  }
+  return res.json({ data });
+});
+
+app.delete("/api/customers/:id", authRequired, async (req, res) => {
+  const { id } = req.params;
+
+  const { data: existingCustomer, error: existingCustomerError } = await supabase
+    .from("customers")
+    .select("id, user_id")
+    .eq("id", id)
+    .single();
+
+  if (existingCustomerError || !existingCustomer) {
+    return res.status(404).json({ error: "Customer not found" });
+  }
+
+  const { error: deleteCustomerError } = await supabase
+    .from("customers")
+    .delete()
+    .eq("id", id);
+  if (deleteCustomerError) {
+    return res.status(400).json({ error: deleteCustomerError.message });
+  }
+
+  if (existingCustomer.user_id) {
+    const { error: deleteUserError } = await supabase
+      .from("users")
+      .delete()
+      .eq("id", existingCustomer.user_id);
+    if (deleteUserError) {
+      return res.status(400).json({ error: deleteUserError.message });
+    }
+  }
+
+  return res.json({ message: "Customer deleted" });
+});
+
 app.get("/api/admin/period-tracker/users", authRequired, async (_req, res) => {
   const { data: customers, error } = await supabase
     .from("customers")
@@ -4431,6 +4591,295 @@ app.get("/api/v1/jan-aushadhi-kendras", async (req, res) => {
     data: data || [],
     meta: { state, district, pin, name, limit, offset },
   });
+});
+
+function startOfUtcWeek(date) {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const day = d.getUTCDay(); // 0=Sun
+  const diff = (day + 6) % 7; // days since Monday
+  d.setUTCDate(d.getUTCDate() - diff);
+  return d;
+}
+
+function formatUtcMonth(date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+app.get("/api/admin/dashboard/overview", authRequired, async (req, res) => {
+  try {
+    const now = new Date();
+
+    // ---- Resolve the requested date range ----
+    const fromParam = req.query.from ? String(req.query.from) : "";
+    const toParam = req.query.to ? String(req.query.to) : "";
+    const rangeParam = String(req.query.range || (fromParam || toParam ? "custom" : "30"));
+
+    let rangeStart = null; // null = all time
+    let rangeEnd = now;
+    if (fromParam || toParam) {
+      rangeStart = fromParam && isIsoDate(fromParam) ? parseIsoDateToUtc(fromParam) : null;
+      rangeEnd = toParam && isIsoDate(toParam) ? addUtcDays(parseIsoDateToUtc(toParam), 1) : now;
+    } else if (rangeParam !== "all") {
+      const days = Math.min(Math.max(Number(rangeParam) || 30, 1), 730);
+      rangeStart = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    }
+    const spanDays = rangeStart ? Math.max(1, Math.round((rangeEnd - rangeStart) / (24 * 60 * 60 * 1000))) : 365;
+    const inRange = (isoOrTimestamp) => {
+      if (!isoOrTimestamp) return false;
+      const t = new Date(isoOrTimestamp);
+      if (rangeStart && t < rangeStart) return false;
+      if (t > rangeEnd) return false;
+      return true;
+    };
+
+    const [
+      customersRes,
+      periodSetupsCountRes,
+      symptomsRes,
+      supportReportsRes,
+      cycleSnapsRes,
+      testimonialsRes,
+      storySubmissionsRes,
+      optionsRes,
+      userOptionsRes,
+      postsRes,
+      activityEventsRes,
+    ] = await Promise.all([
+      supabase
+        .from("customers")
+        .select("id, user_id, name, phone, created_at, users:user_id (email, is_active)")
+        .order("created_at", { ascending: false }),
+      supabase.from("period_tracker_settings").select("user_id", { count: "exact", head: true }),
+      supabase
+        .from("period_tracker_symptoms")
+        .select("user_id, track_date, symptoms, flow_intensity, pain_level, created_at"),
+      supabase.from("support_reports").select("id, status, created_at"),
+      supabase.from("cycle_snaps").select("id, status, created_at"),
+      supabase.from("customer_testimonials").select("id, is_active, is_approved, created_at"),
+      supabase.from("impact_story_submissions").select("id, status, created_at"),
+      supabase.from("period_tracker_options").select("category_key, category_label, option_key, option_label").eq("is_active", true),
+      supabase.from("period_tracker_user_options").select("user_id, selections, updated_at"),
+      supabase.from("posts").select("id, user_id, created_at"),
+      supabase.from("app_activity_events").select("user_id, feature, event_type, created_at").order("created_at", { ascending: false }).limit(20000),
+    ]);
+
+    const customers = customersRes.data || [];
+    const supportReportsAll = supportReportsRes.data || [];
+    const cycleSnapsAll = cycleSnapsRes.data || [];
+    const testimonialsAll = testimonialsRes.error ? [] : (testimonialsRes.data || []);
+    const storySubmissionsAll = isMissingImpactStorySubmissionsTable(storySubmissionsRes.error) ? [] : (storySubmissionsRes.data || []);
+    const postsAll = postsRes.error ? [] : (postsRes.data || []);
+    const optionRows = optionsRes.data || [];
+    const userOptionRowsAll = userOptionsRes.data || [];
+    const activityEventsAll = isMissingActivityEventsTable(activityEventsRes.error) ? [] : (activityEventsRes.data || []);
+
+    // Rows scoped to the selected date range
+    const symptomRows = (symptomsRes.data || []).filter((r) => inRange(r.track_date));
+    const supportReports = supportReportsAll.filter((r) => inRange(r.created_at));
+    const cycleSnaps = cycleSnapsAll.filter((r) => inRange(r.created_at));
+    const testimonials = testimonialsAll.filter((r) => inRange(r.created_at));
+    const storySubmissions = storySubmissionsAll.filter((r) => inRange(r.created_at));
+    const posts = postsAll.filter((r) => inRange(r.created_at));
+    const userOptionRows = userOptionRowsAll.filter((r) => inRange(r.updated_at));
+    const activityEvents = activityEventsAll.filter((r) => inRange(r.created_at));
+    const customersInRange = customers.filter((c) => inRange(c.created_at));
+
+    const customerById = new Map(customers.map((c) => [c.user_id, c]));
+
+    // Most active users, ranked by real feature-usage events when available,
+    // otherwise by number of tracked symptom entries (best available proxy).
+    const usingRealActivityTracking = activityEventsAll.length > 0;
+    const entryCountByUser = new Map();
+    const lastActiveByUser = new Map();
+    const activitySource = usingRealActivityTracking ? activityEvents : symptomRows;
+    for (const row of activitySource) {
+      entryCountByUser.set(row.user_id, (entryCountByUser.get(row.user_id) || 0) + 1);
+      const activityDate = row.created_at || row.track_date;
+      const prevLast = lastActiveByUser.get(row.user_id);
+      if (!prevLast || activityDate > prevLast) {
+        lastActiveByUser.set(row.user_id, activityDate);
+      }
+    }
+    const mostActiveUsers = Array.from(entryCountByUser.entries())
+      .map(([userId, count]) => {
+        const customer = customerById.get(userId);
+        return {
+          user_id: userId,
+          name: customer?.name || "Unknown",
+          email: customer?.users?.email || null,
+          phone: customer?.phone || null,
+          entries_count: count,
+          last_active: lastActiveByUser.get(userId) || null,
+        };
+      })
+      .sort((a, b) => b.entries_count - a.entries_count)
+      .slice(0, 8);
+
+    // Most logged symptoms + flow intensity, within range
+    const symptomCounts = new Map();
+    const flowCounts = new Map();
+    for (const row of symptomRows) {
+      for (const s of row.symptoms || []) {
+        const key = String(s || "").trim().toLowerCase();
+        if (!key) continue;
+        symptomCounts.set(key, (symptomCounts.get(key) || 0) + 1);
+      }
+      if (row.flow_intensity) {
+        const key = String(row.flow_intensity).trim().toLowerCase();
+        flowCounts.set(key, (flowCounts.get(key) || 0) + 1);
+      }
+    }
+    const mostLoggedSymptoms = Array.from(symptomCounts.entries())
+      .map(([key, count]) => ({ key, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+    const flowIntensityBreakdown = Array.from(flowCounts.entries())
+      .map(([key, count]) => ({ key, count }))
+      .sort((a, b) => b.count - a.count);
+
+    // Most selected period-tracker options (preference selections), per category
+    const optionLabelByKey = new Map(optionRows.map((o) => [`${o.category_key}::${o.option_key}`, o.option_label]));
+    const categoryLabelByKey = new Map(optionRows.map((o) => [o.category_key, o.category_label]));
+    const optionSelectionCounts = new Map();
+    for (const row of userOptionRows) {
+      const selections = row.selections || {};
+      for (const [categoryKey, value] of Object.entries(selections)) {
+        const values = Array.isArray(value) ? value : [value];
+        for (const optionKey of values) {
+          if (!optionKey) continue;
+          const mapKey = `${categoryKey}::${optionKey}`;
+          optionSelectionCounts.set(mapKey, (optionSelectionCounts.get(mapKey) || 0) + 1);
+        }
+      }
+    }
+    const mostSelectedOptions = Array.from(optionSelectionCounts.entries())
+      .map(([mapKey, count]) => {
+        const [categoryKey, optionKey] = mapKey.split("::");
+        return {
+          category_key: categoryKey,
+          category_label: categoryLabelByKey.get(categoryKey) || categoryKey,
+          option_key: optionKey,
+          option_label: optionLabelByKey.get(mapKey) || optionKey,
+          count,
+        };
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+
+    // Feature usage — real tracked events if the mobile app is instrumented,
+    // otherwise a proxy built from each feature's own activity table.
+    let featureUsage;
+    let featureUsageSource;
+    if (usingRealActivityTracking) {
+      const counts = new Map();
+      for (const row of activityEvents) {
+        const key = String(row.feature || "other").trim().toLowerCase();
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+      featureUsage = Array.from(counts.entries())
+        .map(([feature, count]) => ({ feature, count }))
+        .sort((a, b) => b.count - a.count);
+      featureUsageSource = "tracked";
+    } else {
+      featureUsage = [
+        { feature: "period_tracker", count: symptomRows.length },
+        { feature: "cycle_snaps", count: cycleSnaps.length },
+        { feature: "community_posts", count: posts.length },
+        { feature: "support", count: supportReports.length },
+        { feature: "testimonials", count: testimonials.length },
+        { feature: "story_submissions", count: storySubmissions.length },
+      ].sort((a, b) => b.count - a.count);
+      featureUsageSource = "proxy";
+    }
+
+    // Signup / activity trend bucketed by day, week or month depending on range size
+    const bucketGranularity = spanDays <= 31 ? "day" : spanDays <= 180 ? "week" : "month";
+    const trendMap = new Map();
+    const bucketKeyFor = (date) => {
+      if (bucketGranularity === "day") return formatUtcDate(date);
+      if (bucketGranularity === "week") return formatUtcDate(startOfUtcWeek(date));
+      return formatUtcMonth(date);
+    };
+    const trendStart = rangeStart || new Date(Math.min(...customers.map((c) => new Date(c.created_at).getTime()), now.getTime()));
+    let cursor = bucketGranularity === "week" ? startOfUtcWeek(trendStart) : trendStart;
+    const stepDays = bucketGranularity === "day" ? 1 : bucketGranularity === "week" ? 7 : 30;
+    let guard = 0;
+    while (cursor <= rangeEnd && guard < 400) {
+      trendMap.set(bucketKeyFor(cursor), 0);
+      cursor = addUtcDays(cursor, stepDays);
+      guard += 1;
+    }
+    const customersForTrend = rangeStart ? customersInRange : customers;
+    for (const c of customersForTrend) {
+      if (!c.created_at) continue;
+      const key = bucketKeyFor(new Date(c.created_at));
+      if (trendMap.has(key)) {
+        trendMap.set(key, trendMap.get(key) + 1);
+      }
+    }
+    const signupTrend = Array.from(trendMap.entries()).map(([date, count]) => ({ date, count }));
+
+    const supportReportsByStatus = supportReports.reduce((acc, row) => {
+      const key = row.status || "open";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    const cycleSnapsByStatus = cycleSnaps.reduce((acc, row) => {
+      const key = row.status || "pending";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    const testimonialsByStatus = testimonials.reduce((acc, row) => {
+      const key = row.is_active === false ? "rejected" : row.is_approved ? "approved" : "pending";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    const storySubmissionsByStatus = storySubmissions.reduce((acc, row) => {
+      const key = row.status || "pending";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+
+    return res.json({
+      data: {
+        range: {
+          granularity: bucketGranularity,
+          start: rangeStart ? formatUtcDate(rangeStart) : null,
+          end: formatUtcDate(rangeEnd),
+          feature_usage_source: featureUsageSource,
+          activity_tracking_enabled: usingRealActivityTracking,
+        },
+        totals: {
+          customers: customers.length,
+          active_customers: customers.filter((c) => c.users?.is_active).length,
+          new_customers_in_range: customersInRange.length,
+          period_tracker_setups: periodSetupsCountRes.count || 0,
+          symptom_entries: symptomRows.length,
+          support_reports_total: supportReports.length,
+          support_reports_open: (supportReportsByStatus.open || 0) + (supportReportsByStatus.in_progress || 0),
+          cycle_snaps_total: cycleSnaps.length,
+          cycle_snaps_pending: cycleSnapsByStatus.pending || 0,
+          community_posts_total: posts.length,
+          testimonials_total: testimonials.length,
+          testimonials_pending: testimonialsByStatus.pending || 0,
+          story_submissions_total: storySubmissions.length,
+          story_submissions_pending: storySubmissionsByStatus.pending || 0,
+        },
+        signup_trend: signupTrend,
+        most_active_users: mostActiveUsers,
+        most_logged_symptoms: mostLoggedSymptoms,
+        flow_intensity_breakdown: flowIntensityBreakdown,
+        most_selected_options: mostSelectedOptions,
+        feature_usage: featureUsage,
+        support_reports_by_status: supportReportsByStatus,
+        cycle_snaps_by_status: cycleSnapsByStatus,
+        testimonials_by_status: testimonialsByStatus,
+        story_submissions_by_status: storySubmissionsByStatus,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message || "Failed to load dashboard overview" });
+  }
 });
 
 app.post("/api/media/upload", authRequired, upload.single("file"), async (req, res) => {

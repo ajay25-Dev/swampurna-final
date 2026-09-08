@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swampurna | Empowering Prashansha</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --earth-red: #a0522d;
+            --deep-terracotta: #8b4513;
+            --soft-cream: #fffaf0;
+            --sand: #f4e1d2;
+            --dark-charcoal: #333333;
+            --white: #ffffff;
+            --success: #4CAF50;
+            --error: #f44336;
+            --accent-pink: #f8d7da;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--soft-cream);
+            /* Decorative Pattern */
+            background-image: radial-gradient(var(--sand) 1.5px, transparent 1.5px);
+            background-size: 30px 30px;
+            color: var(--dark-charcoal);
+            margin: 0;
+            line-height: 1.6;
+        }
+
+        header {
+            background: var(--earth-red);
+            padding: 4rem 1rem;
+            text-align: center;
+            color: var(--white);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            position: relative;
+            /* Ensuring vertical and horizontal alignment */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Period Health Symbol (Heart + Droplet) */
+        .health-logo {
+            width: 70px;
+            height: 70px;
+            margin-bottom: 15px;
+            fill: var(--white);
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+        }
+
+        header h1 { 
+            font-family: 'Playfair Display', serif;
+            margin: 0; 
+            font-size: 3.5rem; 
+            letter-spacing: 6px; 
+            text-transform: uppercase;
+            width: 100%; /* Ensures it centers within the flex container */
+        }
+
+        header p {
+            font-weight: 300;
+            letter-spacing: 2px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        .creator-tag {
+            font-size: 0.9rem;
+            margin-top: 15px;
+            font-style: italic;
+            opacity: 0.8;
+        }
+
+        .container { max-width: 750px; margin: -40px auto 60px; padding: 0 20px; }
+
+        /* Language Switcher - HIGH VISIBILITY */
+        .lang-switcher { 
+            display: flex; 
+            flex-wrap: wrap; 
+            justify-content: center; 
+            gap: 15px; 
+            margin-bottom: 35px; 
+            position: relative;
+            z-index: 10;
+        }
+
+        .lang-btn { 
+            background-color: var(--white); 
+            border: 2.5px solid var(--earth-red); /* Stronger border for visibility */
+            color: var(--earth-red);
+            padding: 12px 24px; 
+            border-radius: 50px; 
+            cursor: pointer;
+            font-weight: 700; /* Bolder font */
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            font-family: 'Poppins', sans-serif;
+            box-shadow: 0 4px 10px rgba(160, 82, 45, 0.2);
+        }
+
+        .lang-btn.active { 
+            background: var(--earth-red); 
+            color: var(--white); 
+            border-color: var(--deep-terracotta);
+            transform: scale(1.1) translateY(-3px);
+            box-shadow: 0 8px 15px rgba(160, 82, 45, 0.4);
+        }
+
+        .lang-btn:hover:not(.active) {
+            background-color: var(--accent-pink);
+            border-color: var(--deep-terracotta);
+            transform: translateY(-2px);
+        }
+
+        .card {
+            background: var(--white);
+            padding: 3rem;
+            border-radius: 25px;
+            box-shadow: 0 20px 40px rgba(160, 82, 45, 0.15);
+            border-top: 10px solid var(--earth-red);
+        }
+
+        .intro-story { 
+            font-family: 'Playfair Display', serif;
+            font-size: 1.25rem;
+            font-style: italic; 
+            background: var(--accent-pink); 
+            padding: 30px; 
+            border-radius: 18px; 
+            margin-bottom: 30px; 
+            border-left: 8px solid var(--earth-red); 
+            color: var(--deep-terracotta);
+        }
+
+        .progress-container { background: #eee; border-radius: 10px; height: 14px; margin-bottom: 30px; overflow: hidden; }
+        .progress-bar { background: var(--earth-red); height: 100%; width: 0%; transition: width 0.6s ease-in-out; }
+
+        .quiz-option {
+            display: block; width: 100%; background: var(--soft-cream);
+            padding: 20px; margin: 15px 0; border: 2.5px solid var(--sand);
+            border-radius: 15px; cursor: pointer; transition: 0.3s;
+            text-align: left; font-size: 1.1rem; font-weight: 600;
+        }
+        .quiz-option:hover { border-color: var(--earth-red); background: #fff; transform: translateX(8px); }
+        .correct { background: var(--success) !important; color: white; border-color: var(--success); }
+        .wrong { background: var(--error) !important; color: white; border-color: var(--error); }
+
+        .btn-action {
+            display: none; width: 100%; background: var(--deep-terracotta);
+            color: white; padding: 18px; border: none; border-radius: 12px;
+            cursor: pointer; margin-top: 30px; font-size: 1.25rem; font-weight: bold;
+            transition: 0.3s; box-shadow: 0 4px 0 var(--earth-red);
+        }
+        .btn-action:active { transform: translateY(2px); box-shadow: none; }
+
+        #result-screen, #thank-you-screen { text-align: center; display: none; animation: fadeIn 0.8s ease; }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .score-circle {
+            width: 150px; height: 150px; border-radius: 50%;
+            background: var(--earth-red); color: white;
+            line-height: 150px; font-size: 3.5rem; margin: 30px auto;
+            border: 6px solid var(--sand); box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+
+        .thank-you-heart { font-size: 5rem; color: var(--earth-red); margin-bottom: 15px; }
+
+        footer { text-align: center; padding: 4rem 1rem; color: #777; font-size: 0.95rem; }
+    </style>
+</head>
+<body>
+
+<header>
+    <svg class="health-logo" viewBox="0 0 24 24">
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z M12 18c2-2 4-4.5 4-7s-1.5-4-3.5-4-3.5 1.5-3.5 4 1.5 5 3 7z"/>
+    </svg>
+    <h1 id="main-title">SWAMPURNA</h1>
+    <p id="sub-title">Knowledge is Empowerment</p>
+    <div class="creator-tag">Created by Paras Jha</div>
+</header>
+
+<div class="container">
+    <div class="lang-switcher">
+        <button class="lang-btn active" onclick="setLanguage('en')">English</button>
+        <button class="lang-btn" onclick="setLanguage('hi')">Hindi (हिंदी)</button>
+        <button class="lang-btn" onclick="setLanguage('bn')">Bengali (বাংলা)</button>
+        <button class="lang-btn" onclick="setLanguage('ta')">Tamil (தமிழ்)</button>
+    </div>
+
+    <div class="card">
+        <div id="intro-screen">
+            <h2 id="welcome-msg" style="font-family: 'Playfair Display', serif; color: var(--earth-red); font-size: 2rem;">Welcome to Swampurna</h2>
+            <div class="intro-story" id="story-text">
+                Prashansha, an 11-year-old girl, noticed a blood spot on her dress. Help Prashansha understand that this 'Menarche' is a healthy milestone!
+            </div>
+            <p id="instruction" style="font-weight: 600;">Guide Prashansha through her journey of knowledge.</p>
+            <button class="btn-action" style="display:block" id="start-btn" onclick="startQuiz()">Start Journey →</button>
+        </div>
+
+        <div id="quiz-ui" style="display:none;">
+            <div class="progress-container"><div class="progress-bar" id="p-bar"></div></div>
+            <p id="q-count" style="font-weight: 700; color: var(--earth-red); text-transform: uppercase; letter-spacing: 1px;"></p>
+            <h3 id="question-text" style="font-family: 'Playfair Display', serif; font-size: 1.7rem; margin-top: 10px;"></h3>
+            <div id="options-container"></div>
+            <p id="feedback" style="margin-top: 20px; font-weight: 600; font-size: 1.1rem;"></p>
+            <button class="btn-action" id="nextBtn" onclick="goToNext()">Next Step →</button>
+        </div>
+
+        <div id="result-screen">
+            <h2 id="result-header" style="font-family: 'Playfair Display', serif; font-size: 2.2rem;">Journey Complete!</h2>
+            <div class="score-circle" id="final-score">0/10</div>
+            <p id="congrats-msg" style="font-size: 1.2rem;"></p>
+            <button class="btn-action" style="display:block; background: var(--success);" onclick="showThankYou()">Continue</button>
+        </div>
+
+        <div id="thank-you-screen">
+            <div class="thank-you-heart">❤</div>
+            <h2 id="thank-title" style="font-family: 'Playfair Display', serif; color: var(--earth-red); font-size: 2.5rem;">Thank You!</h2>
+            <p id="thank-msg" style="font-size: 1.3rem; margin-bottom: 30px;"></p>
+            <button class="btn-action" style="display:block;" onclick="location.reload()">Back to Home</button>
+        </div>
+    </div>
+</div>
+
+<footer>
+    Designed and developed for DST-CSRI project application Swampurna
+</footer>
+
+<script>
+    let currentStep = 0;
+    let score = 0;
+    let currentLang = 'en';
+
+    const translations = {
+        en: {
+            title: "SWAMPURNA", subtitle: "Knowledge is Empowerment", welcome: "Swampurna Welcomes You",
+            story: "Prashansha, an 11-year-old girl, noticed a blood spot on her dress. Help Prashansha understand that this 'Menarche' is a healthy milestone!",
+            instr: "Guide Prashansha through her journey of knowledge.",
+            start: "Start Journey →", next: "Next Step →", resHeader: "Journey Complete!",
+            thankTitle: "Thank You!", thankMsg: "You helped Prashansha by your response. Because of your guidance, she feels confident and healthy!",
+            questions: [
+                { q: "Prashansha asks: What is the main cause of this bleeding?", options: ["Shedding of the uterine lining", "An internal injury", "A stomach infection"], correct: 0, hint: "It's a natural monthly cycle." },
+                { q: "On average, how many days will Prashansha's period run?", options: ["1 day", "3 to 7 days", "2 weeks"], correct: 1, hint: "Most cycles last about a week." },
+                { q: "What is the best barrier for Prashansha to avoid spots?", options: ["Toilet paper", "Sanitary pads", "Cotton cloth"], correct: 1, hint: "Pads are the most hygienic option." },
+                { q: "Prashansha feels pain in her lower belly. What helps?", options: ["Hot water bag", "Running fast", "Drinking cold water"], correct: 0, hint: "Warmth helps relax the muscles." },
+                { q: "Which yoga asana can help Prashansha reduce pain?", options: ["Headstand", "Child's Pose (Balasana)", "Heavy jumping"], correct: 1, hint: "Gentle poses like Balasana are very soothing." },
+                { q: "How often should Prashansha change her pad?", options: ["Every 24 hours", "Every 4 to 6 hours", "Only when full"], correct: 1, hint: "Frequent changes prevent infections." },
+                { q: "Is it okay for Prashansha to bathe during her periods?", options: ["No", "Yes, it's essential", "Only after 3 days"], correct: 1, hint: "Bathing helps you stay clean and fresh." },
+                { q: "How should Prashansha dispose of a used pad?", options: ["Flush it", "Wrap in paper and bin it", "Throw it outside"], correct: 1, hint: "Never flush! Always wrap and bin it." },
+                { q: "What should Prashansha eat to feel stronger?", options: ["Junk food", "Iron-rich food (Spinach/Dates)", "Only sweets"], correct: 1, hint: "Iron helps replenish blood loss." },
+                { q: "What is this first ever period called?", options: ["Menarche", "Menopause", "Fever"], correct: 0, hint: "Menarche is the start of a new life phase." }
+            ]
+        },
+        hi: {
+            title: "स्वम्पूर्णा", subtitle: "ज्ञान ही सशक्तिकरण है", welcome: "स्वम्पूर्णा में आपका स्वागत है",
+            story: "11 साल की प्रशंसा ने अपनी ड्रेस पर खून का धब्बा देखा। प्रशंसा को यह समझाने में मदद करें कि यह 'मेनार्चे' स्वास्थ्य का एक हिस्सा है!",
+            instr: "प्रशंसा को ज्ञान की इस यात्रा में गाइड करें।",
+            start: "यात्रा शुरू करें →", next: "अगला कदम →", resHeader: "यात्रा पूरी हुई!",
+            thankTitle: "धन्यवाद!", thankMsg: "आपने अपनी प्रतिक्रिया से प्रशंसा की मदद की। आपके मार्गदर्शन के कारण, वह अब आत्मविश्वास महसूस करती है!",
+            questions: [
+                { q: "प्रशंसा पूछती है: इस रक्तस्राव का मुख्य कारण क्या है?", options: ["गर्भाशय की परत का झड़ना", "आंतरिक चोट", "पेट का संक्रमण"], correct: 0, hint: "यह एक प्राकृतिक मासिक चक्र है।" },
+                { q: "औसतन, प्रशंसा के पीरियड्स कितने दिनों तक चलेंगे?", options: ["1 दिन", "3 से 7 दिन", "2 हफ्ते"], correct: 1, hint: "ज्यादातर चक्र एक सप्ताह तक चलते हैं।" },
+                { q: "धब्बों से बचने के लिए सबसे अच्छा क्या है?", options: ["टॉयलेट पेपर", "सेनेटरी पैड", "सूती कपड़ा"], correct: 1, hint: "पैड सबसे सुरक्षित विकल्प हैं।" },
+                { q: "पेट में दर्द है। वह इससे कैसे छुटकारा पा सकती है?", options: ["गर्म पानी की थैली", "तेज़ दौड़ना", "ठंडा पानी"], correct: 0, hint: "गर्मी मांसपेशियों को आराम देती है।" },
+                { q: "कौन सा योगासन दर्द कम करने में मदद कर सकता है?", options: ["शीर्षासन", "बालासन (Child's Pose)", "भारी कूद-फांद"], correct: 1, hint: "बालासन कोमल और सुखदायक होता है।" },
+                { q: "स्वस्थ रहने के लिए पैड कब बदलना चाहिए?", options: ["24 घंटे में", "4 से 6 घंटे में", "भर जाने पर"], correct: 1, hint: "संक्रमण से बचाव के लिए बार-बार बदलें।" },
+                { q: "क्या पीरियड्स के दौरान नहाना ठीक है?", options: ["नहीं", "हाँ, आवश्यक है", "3 दिन बाद"], correct: 1, hint: "नहाने से आप तरोताजा महसूस करती हैं।" },
+                { q: "इस्तेमाल किए गए पैड को कैसे फेंकना चाहिए?", options: ["फ्लश करना", "कागज में लपेटकर डस्टबिन में", "बाहर फेंकना"], correct: 1, hint: "हमेशा लपेटकर कचरे के डिब्बे में डालें।" },
+                { q: "मजबूती के लिए प्रशंसा को क्या खाना चाहिए?", options: ["जंक फूड", "आयरन युक्त भोजन", "मिठाई"], correct: 1, hint: "आयरन खून की कमी को पूरा करता है।" },
+                { q: "पहले पीरियड को क्या कहा जाता है?", options: ["मेनार्चे", "मेनोपॉज", "बुखार"], correct: 0, hint: "यह जीवन के एक नए चरण की शुरुआत है।" }
+            ]
+        },
+        bn: {
+            title: "স্বম্পূর্ণা", subtitle: "জ্ঞানই ক্ষমতায়ন", welcome: "স্বম্পূর্ণা আপনাকে স্বাগত জানায়",
+            story: "১১ বছর বয়সী প্রশংশা রক্তের দাগ দেখে আতঙ্কিত। প্রশংশাকে বুঝতে সাহায্য করুন যে এটি একটি স্বাভাবিক ঘটনা!",
+            instr: "প্রশংশাকে তার জ্ঞানের যাত্রায় গাইড করুন।",
+            start: "যাত্রা শুরু করুন →", next: "পরবর্তী ধাপ →", resHeader: "যাত্রা সম্পন্ন!",
+            thankTitle: "ধন্যবাদ!", thankMsg: "আপনার উত্তরের মাধ্যমে আপনি প্রশংশাকে সাহায্য করেছেন। আপনার নির্দেশনায় সে এখন আত্মবিশ্বাসী!",
+            questions: [
+                { q: "রক্তপাতের প্রধান কারণ কী?", options: ["জরায়ুর আস্তরণ ঝরে পড়া", "অভ্যন্তরীণ আঘাত", "সংক্রমণ"], correct: 0, hint: "এটি একটি স্বাভাবিক মাসিক চক্র।" },
+                { q: "গড়ে পিরিয়ড কতদিন চলবে?", options: ["১ দিন", "৩ থেকে ৭ দিন", "২ সপ্তাহ"], correct: 1, hint: "বেশিরভাগ চক্র এক সপ্তাহ স্থায়ী হয়।" },
+                { q: "দাগ এড়াতে প্রশংশার জন্য সেরা উপায় কী?", options: ["টয়লেট পেপার", "স্যানিটারি প্যাড", "সুতির কাপড়"], correct: 1, hint: "প্যাড সবচেয়ে স্বাস্থ্যকর এবং নিরাপদ।" },
+                { q: "পেটে ব্যথা হচ্ছে। সে কীভাবে এটি কমাতে পারে?", options: ["গরম জল", "দৌড়ে", "ঠান্ডা জল"], correct: 0, hint: "উষ্ণতা পেশী শিথিল করতে সাহায্য করে।" },
+                { q: "কোন যোগাসন ব্যথা কমাতে সাহায্য করতে পারে?", options: ["শীর্ষাসন", "বালাসন", "লাফঝাঁপ"], correct: 1, hint: "বালাসন খুব আরামদায়ক।" },
+                { q: "কতক্ষণ অন্তর প্যাড বদলানো উচিত?", options: ["২৪ ঘণ্টায়", "৪-৬ ঘণ্টায়", "ভর্তি হলে"], correct: 1, hint: "সংক্রমণ রোধে বারবার বদলান।" },
+                { q: "পিরিয়ড চলাকালীন স্নান করা কি ঠিক?", options: ["না", "হ্যাঁ, জরুরি", "৩ দিন পর"], correct: 1, hint: "স্নান আপনাকে পরিষ্কার রাখে।" },
+                { q: "ব্যবহৃত প্যাড কীভাবে ফেলা উচিত?", options: ["ফ্লাশ করে", "কাগজে মুড়িয়ে ডাস্টবিনে", "বাইরে ফেলে"], correct: 1, hint: "সবসময় মুড়িয়ে ডাস্টবিনে ফেলুন।" },
+                { q: "শক্তিশালী বোধ করতে প্রশংশার কী খাওয়া উচিত?", options: ["জাঙ্ক ফুড", "আয়রণ সমৃদ্ধ খাবার", "মিষ্টি"], correct: 1, hint: "আয়রণ রক্তাল্পতা পূরণ করে।" },
+                { q: "প্রথম পিরিয়ডকে কী বলা হয়?", options: ["মেনarche", "মেনোপজ", "জ্বর"], correct: 0, hint: "এটি নতুন পর্যায়ের সুন্দর সূচনা।" }
+            ]
+        },
+        ta: {
+            title: "சுவாம்பூர்ணா", subtitle: "அறிவே ஆற்றல்", welcome: "சுவாம்பூர்ணா உங்களை வரவேற்கிறது",
+            story: "11 வயது பிரஷான்ஷா பயந்துபோய் இருக்கிறாள். இது ஒரு ஆரோக்கியமான வளர்ச்சி என்பதை அவளுக்கு புரிய வைப்போம்!",
+            instr: "பிரஷான்ஷாவின் அறிவுப் பயணத்தில் வழிகாட்டுங்கள்.",
+            start: "தொடங்கு →", next: "அடுத்த படி →", resHeader: "முடிந்தது!",
+            thankTitle: "நன்றி!", thankMsg: "உங்கள் பதில்களின் மூலம் பிரஷான்ஷாவுக்கு உதவினீர்கள். உங்கள் வழிகாட்டலால் அவள் ஆரோக்கியமாக உணர்கிறாள்!",
+            questions: [
+                { q: "இந்த இரத்தப்போக்கின் முக்கிய காரணம் என்ன?", options: ["கருப்பையின் உள் சுவர் உதிர்தல்", "காயம்", "தொற்று"], correct: 0, hint: "இது ஒரு இயற்கையான சுழற்சி." },
+                { q: "மாதவிடாய் சராசரியாக எத்தனை நாட்கள் இருக்கும்?", options: ["1 நாள்", "3-7 நாட்கள்", "2 வாரங்கள்"], correct: 1, hint: "சுழற்சிகள் ஒரு வாரம் வரை இருக்கும்." },
+                { q: "கறைகளைத் தவிர்க்க எது சிறந்தது?", options: ["காகிதம்", "பேட்கள்", "துணி"], correct: 1, hint: "பேட்கள் மிகவும் பாதுகாப்பானது." },
+                { q: "அடிவயிற்றில் வலி உள்ளது. எது உதவும்?", options: ["சுடு நீர் பை", "ஓடுதல்", "குளிர்ந்த நீர்"], correct: 0, hint: "வெப்பம் தசைகளைத் தளர்த்த உதவும்." },
+                { q: "வலி குறைய எந்த யோகாசனம் உதவும்?", options: ["ஷீர்சாசனம்", "பாலாசனம்", "குதித்தல்"], correct: 1, hint: "பாலாசனம் மிகவும் இதமானது." },
+                { q: "எத்தனை மணி நேரத்திற்கு ஒருமுறை பேடை மாற்ற வேண்டும்?", options: ["24 மணி", "4-6 மணி", "நிரம்பிய பின்"], correct: 1, hint: "அடிக்கடி மாற்றுவது கிருமித் தொற்றைத் தடுக்கும்." },
+                { q: "மாதவிடாய் காலத்தில் குளிக்கலாமா?", options: ["கூடாது", "ஆம், அவசியம்", "3 நாட்களுக்குப் பின்"], correct: 1, hint: "குளிப்பது உங்களை புத்துணர்ச்சியாக வைத்திருக்கும்." },
+                { q: "பயன்படுத்திய பேடை எப்படி அப்புறப்படுத்த வேண்டும்?", options: ["ஃபிளஷ்", "காகிதத்தில் சுற்றி குப்பையில்", "வெளியே எறிவது"], correct: 1, hint: "எப்போதும் சுற்றி குப்பையில் போடவும்." },
+                { q: "பலமாக இருக்க எதை உண்ண வேண்டும்?", options: ["ஜங்க் ஃபுட்", "இரும்புச்சத்து உணவு", "இனிப்பு"], correct: 1, hint: "இரும்புச்சத்து இரத்த இழப்பை ஈடுகட்டும்." },
+                { q: "முதல் மாதவிடாய் எவ்வாறு அழைக்கப்படுகிறது?", options: ["மெனார்க்கி", "மெனோபாஸ்", "காய்ச்சல்"], correct: 0, hint: "மெனார்க்கி ஒரு புதிய தொடக்கம்." }
+            ]
+        }
+    };
+
+    function setLanguage(lang) {
+        currentLang = lang;
+        document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+        const btnText = lang === 'en' ? 'english' : lang === 'hi' ? 'hindi' : lang === 'bn' ? 'bengali' : 'tamil';
+        const activeBtn = Array.from(document.querySelectorAll('.lang-btn')).find(b => b.innerText.toLowerCase().includes(btnText));
+        if(activeBtn) activeBtn.classList.add('active');
+        updateStaticText();
+        if (document.getElementById('quiz-ui').style.display === 'block') showQuestion();
+    }
+
+    function updateStaticText() {
+        const t = translations[currentLang];
+        document.getElementById('main-title').innerText = t.title;
+        document.getElementById('sub-title').innerText = t.subtitle;
+        document.getElementById('welcome-msg').innerText = t.welcome;
+        document.getElementById('story-text').innerText = t.story;
+        document.getElementById('instruction').innerText = t.instr;
+        document.getElementById('start-btn').innerText = t.start;
+        document.getElementById('nextBtn').innerText = t.next;
+        document.getElementById('result-header').innerText = t.resHeader;
+        document.getElementById('thank-title').innerText = t.thankTitle;
+        document.getElementById('thank-msg').innerText = t.thankMsg;
+    }
+
+    function startQuiz() {
+        document.getElementById('intro-screen').style.display = 'none';
+        document.getElementById('quiz-ui').style.display = 'block';
+        showQuestion();
+    }
+
+    function showQuestion() {
+        const t = translations[currentLang];
+        const qData = t.questions[currentStep];
+        document.getElementById('q-count').innerText = `Step ${currentStep + 1} of 10`;
+        document.getElementById('question-text').innerText = qData.q;
+        const container = document.getElementById('options-container');
+        container.innerHTML = '';
+        qData.options.forEach((opt, index) => {
+            const btn = document.createElement('button');
+            btn.className = 'quiz-option';
+            btn.innerText = opt;
+            btn.onclick = () => checkAnswer(index, qData.correct, qData.hint);
+            container.appendChild(btn);
+        });
+        document.getElementById('p-bar').style.width = ((currentStep + 1) / 10 * 100) + "%";
+    }
+
+    function checkAnswer(selected, correct, hint) {
+        const options = document.querySelectorAll('.quiz-option');
+        options.forEach(opt => opt.style.pointerEvents = 'none');
+        if(selected === correct) {
+            options[selected].classList.add('correct');
+            document.getElementById('feedback').innerText = "✅ " + hint;
+            document.getElementById('feedback').style.color = "var(--success)";
+            score++;
+        } else {
+            options[selected].classList.add('wrong');
+            options[correct].classList.add('correct');
+            document.getElementById('feedback').innerText = "❌ " + hint;
+            document.getElementById('feedback').style.color = "var(--error)";
+        }
+        document.getElementById('nextBtn').style.display = 'block';
+    }
+
+    function goToNext() {
+        currentStep++;
+        if(currentStep < 10) {
+            document.getElementById('nextBtn').style.display = 'none';
+            document.getElementById('feedback').innerText = '';
+            showQuestion();
+        } else {
+            showResults();
+        }
+    }
+
+    function showResults() {
+        document.getElementById('quiz-ui').style.display = "none";
+        document.getElementById('result-screen').style.display = "block";
+        document.getElementById('final-score').innerText = `${score}/10`;
+        document.getElementById('congrats-msg').innerText = score >= 8 ? "Excellent! You are a powerful advocate for health!" : "Good effort! Every step towards knowledge matters.";
+    }
+
+    function showThankYou() {
+        document.getElementById('result-screen').style.display = "none";
+        document.getElementById('thank-you-screen').style.display = "block";
+    }
+</script>
+</body>
+</html>

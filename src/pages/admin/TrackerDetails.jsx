@@ -36,10 +36,17 @@ const FieldCard = ({ label, value }) => (
   </div>
 );
 
+const EmptyState = ({ icon = "—", text, card = false }) => (
+  <div className={`empty-state ${card ? "card" : ""}`}>
+    <span className="empty-icon">{icon}</span>
+    <span>{text}</span>
+  </div>
+);
+
 const DataTable = ({ columns, rows, emptyText }) => (
   <div className="table-wrap">
     {rows.length === 0 ? (
-      <p className="empty-line">{emptyText}</p>
+      <EmptyState text={emptyText} />
     ) : (
       <table>
         <thead>
@@ -65,7 +72,7 @@ const DataTable = ({ columns, rows, emptyText }) => (
 
 const KeyValueGrid = ({ data, exclude = [] }) => {
   const entries = Object.entries(data || {}).filter(([key]) => !exclude.includes(key));
-  if (!entries.length) return <p className="empty-line">No details available.</p>;
+  if (!entries.length) return <EmptyState card icon="⚙️" text="No details available." />;
   return (
     <div className="kv-grid">
       {entries.map(([key, value]) => (
@@ -88,7 +95,7 @@ const statusLabel = (status, legend = []) => {
 };
 
 const PredictionSummary = ({ summary }) => {
-  if (!summary) return <p className="empty-line">No prediction summary available.</p>;
+  if (!summary) return <EmptyState card icon="🔮" text="No prediction summary available. This customer needs a cycle setup first." />;
 
   const data = summary.data || {};
   const days = Array.isArray(data.days) ? data.days : [];
@@ -221,6 +228,8 @@ const TrackerDetails = () => {
   const logs = details?.logs || [];
   const symptoms = details?.symptoms || [];
   const reminders = details?.reminders || [];
+  const hasNotificationSettings = notificationSettings && Object.keys(notificationSettings).some((k) => !["id", "user_id"].includes(k));
+  const hasAnyTrackerData = Boolean(setup || summary || logs.length || symptoms.length || reminders.length || hasNotificationSettings);
 
   return (
     <AdminLayout>
@@ -298,81 +307,91 @@ const TrackerDetails = () => {
                   </div>
                 </div>
 
-                <div className="section">
-                  <h3>Cycle Setup</h3>
-                  {setup ? (
-                    <div className="kv-grid important-grid">
-                      <FieldCard label="Last Period Start" value={formatDate(setup.last_period_start_date)} />
-                      <FieldCard label="Period End" value={formatDate(setup.period_end_date)} />
-                      <FieldCard label="Cycle Length" value={`${setup.cycle_length_days || "N/A"} days`} />
-                      <FieldCard label="Period Length" value={`${setup.period_length_days || "N/A"} days`} />
-                      <FieldCard label="Pre Period Days" value={setup.pre_period_days} />
-                      <FieldCard label="Post Period Days" value={setup.post_period_days} />
-                      <FieldCard label="Ovulation Start Day" value={setup.ovulation_start_day} />
-                      <FieldCard label="Ovulation Window" value={`${setup.ovulation_window_days || "N/A"} days`} />
-                      <FieldCard label="Selected Dates" value={setup.selected_dates?.map(formatDate)} />
-                      <FieldCard label="Has No Idea" value={setup.has_no_idea} />
-                      <FieldCard label="Notes" value={setup.notes} />
-                      <FieldCard label="Last Updated" value={formatDate(setup.updated_at)} />
+                {!hasAnyTrackerData ? (
+                  <EmptyState
+                    card
+                    icon="📭"
+                    text="This customer hasn't set up or used the period tracker yet — no cycle setup, logs, symptoms, reminders or notification preferences on file."
+                  />
+                ) : (
+                  <>
+                    <div className="tracker-section">
+                      <h3>Cycle Setup</h3>
+                      {setup ? (
+                        <div className="kv-grid important-grid">
+                          <FieldCard label="Last Period Start" value={formatDate(setup.last_period_start_date)} />
+                          <FieldCard label="Period End" value={formatDate(setup.period_end_date)} />
+                          <FieldCard label="Cycle Length" value={`${setup.cycle_length_days || "N/A"} days`} />
+                          <FieldCard label="Period Length" value={`${setup.period_length_days || "N/A"} days`} />
+                          <FieldCard label="Pre Period Days" value={setup.pre_period_days} />
+                          <FieldCard label="Post Period Days" value={setup.post_period_days} />
+                          <FieldCard label="Ovulation Start Day" value={setup.ovulation_start_day} />
+                          <FieldCard label="Ovulation Window" value={`${setup.ovulation_window_days || "N/A"} days`} />
+                          <FieldCard label="Selected Dates" value={setup.selected_dates?.map(formatDate)} />
+                          <FieldCard label="Has No Idea" value={setup.has_no_idea} />
+                          <FieldCard label="Notes" value={setup.notes} />
+                          <FieldCard label="Last Updated" value={formatDate(setup.updated_at)} />
+                        </div>
+                      ) : (
+                        <EmptyState card icon="🗓️" text="No setup saved." />
+                      )}
                     </div>
-                  ) : (
-                    <p className="empty-line">No setup saved.</p>
-                  )}
-                </div>
 
-                <div className="section">
-                  <h3>Prediction Summary</h3>
-                  <PredictionSummary summary={summary} />
-                </div>
+                    <div className="tracker-section">
+                      <h3>Prediction Summary</h3>
+                      <PredictionSummary summary={summary} />
+                    </div>
 
-                <div className="section">
-                  <h3>Notification Settings</h3>
-                  <KeyValueGrid data={notificationSettings} exclude={["id", "user_id"]} />
-                </div>
+                    <div className="tracker-section">
+                      <h3>Notification Settings</h3>
+                      <KeyValueGrid data={notificationSettings} exclude={["id", "user_id"]} />
+                    </div>
 
-                <div className="section">
-                  <h3>Recent Period Logs</h3>
-                  <DataTable
-                    rows={logs.slice(0, 20)}
-                    emptyText="No period logs found."
-                    columns={[
-                      { key: "period_start_date", label: "Start", render: (row) => formatDate(row.period_start_date) },
-                      { key: "period_end_date", label: "End", render: (row) => formatDate(row.period_end_date) },
-                      { key: "flow", label: "Flow" },
-                      { key: "notes", label: "Notes" },
-                      { key: "created_at", label: "Created", render: (row) => formatDate(row.created_at) },
-                    ]}
-                  />
-                </div>
+                    <div className="tracker-section">
+                      <h3>Recent Period Logs</h3>
+                      <DataTable
+                        rows={logs.slice(0, 20)}
+                        emptyText="No period logs found."
+                        columns={[
+                          { key: "period_start_date", label: "Start", render: (row) => formatDate(row.period_start_date) },
+                          { key: "period_end_date", label: "End", render: (row) => formatDate(row.period_end_date) },
+                          { key: "flow", label: "Flow" },
+                          { key: "notes", label: "Notes" },
+                          { key: "created_at", label: "Created", render: (row) => formatDate(row.created_at) },
+                        ]}
+                      />
+                    </div>
 
-                <div className="section">
-                  <h3>Recent Symptoms</h3>
-                  <DataTable
-                    rows={symptoms.slice(0, 20)}
-                    emptyText="No symptom entries found."
-                    columns={[
-                      { key: "track_date", label: "Date", render: (row) => formatDate(row.track_date) },
-                      { key: "mood", label: "Mood" },
-                      { key: "pain_level", label: "Pain" },
-                      { key: "symptoms", label: "Symptoms" },
-                      { key: "notes", label: "Notes" },
-                    ]}
-                  />
-                </div>
+                    <div className="tracker-section">
+                      <h3>Recent Symptoms</h3>
+                      <DataTable
+                        rows={symptoms.slice(0, 20)}
+                        emptyText="No symptom entries found."
+                        columns={[
+                          { key: "track_date", label: "Date", render: (row) => formatDate(row.track_date) },
+                          { key: "mood", label: "Mood" },
+                          { key: "pain_level", label: "Pain" },
+                          { key: "symptoms", label: "Symptoms" },
+                          { key: "notes", label: "Notes" },
+                        ]}
+                      />
+                    </div>
 
-                <div className="section">
-                  <h3>Reminders</h3>
-                  <DataTable
-                    rows={reminders}
-                    emptyText="No reminders set."
-                    columns={[
-                      { key: "reminder_type", label: "Type" },
-                      { key: "reminder_time", label: "Time" },
-                      { key: "is_enabled", label: "Enabled", render: (row) => formatBool(row.is_enabled) },
-                      { key: "created_at", label: "Created", render: (row) => formatDate(row.created_at) },
-                    ]}
-                  />
-                </div>
+                    <div className="tracker-section">
+                      <h3>Reminders</h3>
+                      <DataTable
+                        rows={reminders}
+                        emptyText="No reminders set."
+                        columns={[
+                          { key: "reminder_type", label: "Type" },
+                          { key: "reminder_time", label: "Time" },
+                          { key: "is_enabled", label: "Enabled", render: (row) => formatBool(row.is_enabled) },
+                          { key: "created_at", label: "Created", render: (row) => formatDate(row.created_at) },
+                        ]}
+                      />
+                    </div>
+                  </>
+                )}
 
                 {Array.isArray(details.warnings) && details.warnings.length > 0 && (
                   <div className="warnings">
@@ -555,12 +574,12 @@ const Wrap = styled.div`
     overflow-wrap: anywhere;
   }
 
-  .section {
+  .tracker-section {
     display: grid;
     gap: var(--space-2);
   }
 
-  .section h3 {
+  .tracker-section h3 {
     font-size: var(--text-lg);
     margin: 0;
   }
@@ -659,10 +678,25 @@ const Wrap = styled.div`
     border-bottom: 0;
   }
 
-  .empty-line {
+  .empty-state {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
     color: var(--color-dark-500);
-    margin: 0;
-    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+    padding: var(--space-3);
+  }
+
+  .empty-state.card {
+    background: #f9fafb;
+    border: 1px dashed var(--color-dark-200);
+    border-radius: var(--radius-lg);
+  }
+
+  .empty-icon {
+    font-size: 1.1rem;
+    opacity: 0.7;
+    flex-shrink: 0;
   }
 
   .warnings {

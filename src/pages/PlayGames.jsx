@@ -9,6 +9,36 @@ const PlayGames = () => {
   const description =
     "Learning about menstrual health doesn’t have to be boring! Dive into our interactive games designed to educate, engage, and empower young girls and communities. Through fun quizzes, animated challenges, and immersive storytelling, we turn knowledge into action. Let’s play and break the taboos together!";
 
+  const games = [
+    {
+      title: "Period Power Quest",
+      thumb: GameImg1,
+      src: "/unity/game1/index.html",
+      landscape: true,
+    },
+    {
+      title: "Flow Runner: Period Power",
+      icon: "🏃‍♀️",
+      src: "/games/flow-runner/index.html",
+      landscape: true,
+    },
+    {
+      title: "Period Awareness Stories",
+      icon: "📖",
+      src: "/games/period-stories/index.html",
+    },
+    {
+      title: "Swampurna: Care & Confidence",
+      icon: "💗",
+      src: "/games/care-confidence/index.html",
+    },
+    {
+      title: "Path Towards Menstruation Knowledge",
+      icon: "🧠",
+      src: "/games/menstruation-knowledge/index.html",
+    },
+  ];
+
   const [selectedGame, setSelectedGame] = useState(null);
   const [isPortrait, setIsPortrait] = useState(window.innerHeight > window.innerWidth);
 
@@ -24,11 +54,9 @@ const PlayGames = () => {
   }, []);
 
   // Function to open the game in the modal
-  const startGame = (gameIndex) => {
-    if (gameIndex === 0) {
-      setSelectedGame("/unity/game1/index.html"); // Path to Unity game
-      lockOrientation();
-    }
+  const startGame = (game) => {
+    setSelectedGame(game);
+    if (game.landscape) lockOrientation();
   };
 
   // Function to close the modal
@@ -59,34 +87,37 @@ const PlayGames = () => {
     <PlayGamesComp>
       <OurTeamOne heading={heading} description={description} />
       <div className="Game-Box">
-        <div className="game-card">
-          <img
-            src={GameImg1}
-            className="Game-image"
-            alt="Game 1"
-          />
-          <button
-            className="game-start-button"
-            onClick={() => startGame(0)}
-          >
-            Start Game
-          </button>
-        </div>
+        {games.map((game) => (
+          <div className="game-card" key={game.title}>
+            {game.thumb ? (
+              <img src={game.thumb} className="Game-image" alt={game.title} />
+            ) : (
+              <div className="Game-icon">{game.icon}</div>
+            )}
+            <h3 className="game-title">{game.title}</h3>
+            <button
+              className="game-start-button"
+              onClick={() => startGame(game)}
+            >
+              Start Game
+            </button>
+          </div>
+        ))}
       </div>
 
       {/* Show Rotate Screen Message if in Portrait */}
-      {isPortrait && selectedGame && (
+      {isPortrait && selectedGame?.landscape && (
         <RotateMessage>
           <p>🔄 Please rotate your device to landscape mode</p>
         </RotateMessage>
       )}
 
-      {/* Custom Modal for Unity Game */}
+      {/* Custom Modal for the selected game */}
       {selectedGame && (
         <ModalOverlay>
           <ModalContent>
             <CloseButton onClick={closeModal}>&times;</CloseButton>
-            <iframe src={selectedGame} title="Unity Game" />
+            <iframe src={selectedGame.src} title={selectedGame.title} />
           </ModalContent>
         </ModalOverlay>
       )}
@@ -103,9 +134,10 @@ const PlayGamesComp = styled.div`
 
   .Game-Box {
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
     padding: 10px;
-    gap: 1rem;
+    gap: 1.5rem;
   }
 
   .game-card {
@@ -117,7 +149,7 @@ const PlayGamesComp = styled.div`
     border-radius: 10px;
     box-shadow: 3px 3px 6px #ccc, -3px -3px 6px #fff;
     transition: 0.3s;
-    max-width: 400px;
+    max-width: 280px;
     width: 100%;
   }
 
@@ -127,9 +159,29 @@ const PlayGamesComp = styled.div`
   }
 
   .Game-image {
-    height: auto;
+    height: 160px;
     width: 100%;
+    object-fit: cover;
     border-radius: 10px;
+  }
+
+  .Game-icon {
+    height: 160px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 4rem;
+    border-radius: 10px;
+    background: linear-gradient(145deg, #ffe1ea, #ffc4d6);
+  }
+
+  .game-title {
+    margin: 0.8rem 0 0;
+    font-size: 1rem;
+    text-align: center;
+    color: #20237b;
+    min-height: 2.4em;
   }
 
   .game-start-button {

@@ -16,8 +16,10 @@ const initialForm = {
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
   const [form, setForm] = useState(initialForm);
+  const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -38,18 +40,68 @@ const Customers = () => {
     loadCustomers();
   }, []);
 
+  const startEdit = (c) => {
+    setEditingId(c.id);
+    setForm({
+      name: c.name || "",
+      email: c.users?.email || "",
+      password: "",
+      phone: c.phone || "",
+      status: c.status || "new",
+      notes: c.notes || "",
+      is_active: c.users?.is_active ?? true,
+    });
+    setMessage("");
+    setError("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setForm(initialForm);
+    setMessage("");
+    setError("");
+  };
+
+  const onDelete = async (c) => {
+    if (!window.confirm(`Delete customer "${c.name}"? This permanently removes their account and all related data.`)) {
+      return;
+    }
+    setDeletingId(c.id);
+    setError("");
+    setMessage("");
+    try {
+      await adminApi.deleteCustomer(c.id);
+      setMessage("Customer deleted.");
+      if (editingId === c.id) cancelEdit();
+      await loadCustomers();
+    } catch (err) {
+      setError(err.message || "Failed to delete customer");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError("");
     setMessage("");
     try {
-      await adminApi.createCustomer(form);
+      if (editingId) {
+        const payload = { ...form };
+        if (!payload.password) delete payload.password;
+        await adminApi.updateCustomer(editingId, payload);
+        setMessage("Customer updated.");
+        setEditingId(null);
+      } else {
+        await adminApi.createCustomer(form);
+        setMessage("Customer created.");
+      }
       setForm(initialForm);
-      setMessage("Customer created.");
       await loadCustomers();
     } catch (err) {
-      setError(err.message || "Failed to create customer");
+      setError(err.message || (editingId ? "Failed to update customer" : "Failed to create customer"));
     } finally {
       setSaving(false);
     }
@@ -65,7 +117,7 @@ const Customers = () => {
 
         <div className="grid">
           <section className="card">
-            <h2>Create Customer</h2>
+            <h2>{editingId ? "Edit Customer" : "Create Customer"}</h2>
             <form onSubmit={onSubmit} className="form">
               <label>
                 Name
@@ -85,12 +137,13 @@ const Customers = () => {
                 />
               </label>
               <label>
-                Password
+                Password{editingId && <span className="hint"> (leave blank to keep current password)</span>}
                 <input
                   type="password"
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  required
+                  required={!editingId}
+                  placeholder={editingId ? "••••••••" : ""}
                 />
               </label>
               <label>
@@ -127,9 +180,16 @@ const Customers = () => {
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 />
               </label>
-              <button type="submit" disabled={saving}>
-                {saving ? "Creating..." : "Create Customer"}
-              </button>
+              <div className="form-actions">
+                <button type="submit" disabled={saving}>
+                  {saving ? (editingId ? "Saving..." : "Creating...") : editingId ? "Save Changes" : "Create Customer"}
+                </button>
+                {editingId && (
+                  <button type="button" className="secondary" onClick={cancelEdit} disabled={saving}>
+                    Cancel
+                  </button>
+                )}
+              </div>
             </form>
             {message && <div className="ok">{message}</div>}
             {error && <div className="err">{error}</div>}
@@ -152,6 +212,7 @@ const Customers = () => {
                       <th>Status</th>
                       <th>Account</th>
                       <th>Created</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -171,6 +232,21 @@ const Customers = () => {
                           </span>
                         </td>
                         <td>{new Date(c.created_at).toLocaleDateString()}</td>
+                        <td>
+                          <div className="row-actions">
+                            <button type="button" className="link-btn" onClick={() => startEdit(c)}>
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="link-btn danger"
+                              onClick={() => onDelete(c)}
+                              disabled={deletingId === c.id}
+                            >
+                              {deletingId === c.id ? "Deleting..." : "Delete"}
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -252,6 +328,45 @@ const Wrap = styled.div`
     background: var(--gradient-primary);
     color: white;
     font-weight: 600;
+  }
+
+  .hint {
+    font-weight: 400;
+    color: var(--color-dark-400);
+    font-size: 0.75rem;
+  }
+
+  .form-actions {
+    display: flex;
+    gap: var(--space-3);
+  }
+
+  button.secondary {
+    background: var(--color-dark-100);
+    color: var(--color-dark-700);
+  }
+
+  .row-actions {
+    display: flex;
+    gap: var(--space-3);
+  }
+
+  .link-btn {
+    width: auto;
+    padding: 4px 0;
+    background: none;
+    color: var(--color-primary-600);
+    font-weight: 600;
+    font-size: 0.8rem;
+    border-radius: 0;
+  }
+
+  .link-btn.danger {
+    color: #dc2626;
+  }
+
+  .link-btn:disabled {
+    opacity: 0.5;
   }
 
   .ok {
