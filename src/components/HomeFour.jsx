@@ -37,10 +37,15 @@ const HomeFour = () => {
   const header = headerItems?.[0] || {};
 
   const EventCard = ({ event, index }) => (
-    <div 
+    <div
       className={`event-card ${event.type}`}
       style={{ animationDelay: `${index * 80}ms` }}
     >
+      {event.image && (
+        <div className="event-image">
+          <img src={event.image} alt={event.heading || "Update"} loading="lazy" />
+        </div>
+      )}
       <div className="event-header">
         <span className="event-category">{event.category}</span>
         <div className="event-date">
@@ -48,11 +53,21 @@ const HomeFour = () => {
           <span>{event.date}</span>
         </div>
       </div>
-      <p className="event-text">{event.text}</p>
-      <button className="event-link">
-        <span>Learn more</span>
-        <FiChevronRight />
-      </button>
+      {event.heading && <h4 className="event-heading">{event.heading}</h4>}
+      {event.body && (
+        <div className="event-text" dangerouslySetInnerHTML={{ __html: event.body }} />
+      )}
+      {event.link ? (
+        <a className="event-link" href={event.link} target="_blank" rel="noopener noreferrer">
+          <span>Read More</span>
+          <FiChevronRight />
+        </a>
+      ) : (
+        <button className="event-link" disabled>
+          <span>Learn more</span>
+          <FiChevronRight />
+        </button>
+      )}
     </div>
   );
 
@@ -94,7 +109,7 @@ const HomeFour = () => {
                 </div>
               ) : (
                 events.map((event, index) => (
-                  <EventCard event={{ ...event, type: "current", date: event.subtitle, category: event.tag, text: event.title }} index={index} key={event.id || index} />
+                  <EventCard event={{ ...event, type: "current", date: event.subtitle, category: event.tag, heading: event.title, body: event.description, link: event.link_url, image: event.image_url }} index={index} key={event.id || index} />
                 ))
               )}
             </div>
@@ -118,7 +133,7 @@ const HomeFour = () => {
                 </div>
               ) : (
                 upcomingEvents.map((event, index) => (
-                  <EventCard event={{ ...event, type: "upcoming", date: event.subtitle, category: event.tag, text: event.title }} index={index} key={event.id || index} />
+                  <EventCard event={{ ...event, type: "upcoming", date: event.subtitle, category: event.tag, heading: event.title, body: event.description, link: event.link_url, image: event.image_url }} index={index} key={event.id || index} />
                 ))
               )}
             </div>
@@ -142,7 +157,7 @@ const HomeFour = () => {
                 </div>
               ) : (
                 latestUpdates.map((event, index) => (
-                  <EventCard event={{ ...event, type: "update", date: event.subtitle, category: event.tag, text: event.title }} index={index} key={event.id || index} />
+                  <EventCard event={{ ...event, type: "update", date: event.subtitle, category: event.tag, heading: event.title, body: event.description, link: event.link_url, image: event.image_url }} index={index} key={event.id || index} />
                 ))
               )}
             </div>
@@ -433,11 +448,36 @@ const UpdatesSection = styled.section`
     }
   }
 
+  .event-image {
+    margin: 0 0 var(--space-3) 0;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+
+    img {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      display: block;
+    }
+  }
+
+  .event-heading {
+    font-family: var(--font-heading);
+    font-size: var(--text-base);
+    font-weight: 600;
+    color: var(--color-dark-900);
+    margin: 0 0 var(--space-2) 0;
+  }
+
   .event-text {
     font-size: var(--text-sm);
     color: var(--color-dark-700);
     line-height: 1.6;
     margin: 0 0 var(--space-3) 0;
+
+    p {
+      margin: 0 0 var(--space-2) 0;
+    }
   }
 
   .event-link {
@@ -449,6 +489,14 @@ const UpdatesSection = styled.section`
     color: var(--color-primary-600);
     opacity: 0;
     transition: all var(--transition-base);
+    background: none;
+    border: none;
+    cursor: pointer;
+
+    &:disabled {
+      cursor: default;
+      color: var(--color-dark-400);
+    }
 
     svg {
       transition: transform var(--transition-base);

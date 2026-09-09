@@ -375,14 +375,14 @@ const PageEditor = () => {
         page_slug: contentSlug,
         section_key: finalSectionKey,
         title: isPhotoGallery ? "" : isVideoGallery ? "New Video" : isImpactStory ? "New Article" : isImpactStories ? "New Story" : isNewsArticles ? "New Article" : isFaqs ? "New question?" : isCompetitionEvent ? "New Event" : isMythsTaboos ? "New myth heading" : isMenstrualProducts ? "New Product" : isGovernmentInitiatives ? "New milestone title" : isOurTeam ? "New Team Member" : isOurApproach ? "New Approach Title" : isHeroImages ? "" : isPrincipalInvestigator ? "Dr. Full Name" : isAboutHeader ? "Know Who We Are" : isAboutAccordion ? "New accordion title" : isAboutVideo ? "Watch Our Story" : isFeaturesHeader ? "Why Millions of Women Choose Swampurna?" : isFeatures ? "New feature title" : isUpdatesHeader ? "News & Events" : isEventSection ? "New update text" : "New Item",
-        image_url: isPhotoGallery ? uploadUrl : isVideoGallery ? "" : (isImpactStory || isImpactStories || isNewsArticles || isCompetitionEvent || isMenstrualProducts || isOurTeam || isOurApproach || isHeroImages || isPrincipalInvestigator || isAboutVideo) ? "" : undefined,
-        description: isFaqs ? "New answer..." : isMenstrualProducts ? "" : isGovernmentInitiatives ? "" : isOurTeam ? "" : isOurApproach ? "" : (isPrincipalInvestigator || isAboutAccordion) ? "" : isFeatures ? "" : undefined,
+        image_url: isPhotoGallery ? uploadUrl : isVideoGallery ? "" : (isImpactStory || isImpactStories || isNewsArticles || isCompetitionEvent || isMenstrualProducts || isOurTeam || isOurApproach || isHeroImages || isPrincipalInvestigator || isAboutVideo || isEventSection) ? "" : undefined,
+        description: isFaqs ? "New answer..." : isMenstrualProducts ? "" : isGovernmentInitiatives ? "" : isOurTeam ? "" : isOurApproach ? "" : (isPrincipalInvestigator || isAboutAccordion) ? "" : isFeatures ? "" : isEventSection ? "" : undefined,
         tag: isFaqs ? "active" : isMythsTaboos ? "active" : isMenstrualProducts ? "primary" : isOurTeam ? "primary" : isOurApproach ? "primary" : isAboutHeader ? "About Swampurna" : isAboutAccordion ? "✨" : isFeatures ? "primary" : isFeaturesHeader ? "Why Choose Us" : isUpdatesHeader ? "Stay Updated" : isEventSection ? "Category" : undefined,
-        meta: isImpactStories ? { color: "primary", isHeader: false } : isCompetitionEvent ? { location: "", buttonText: "Register Now", color: "primary" } : isGovernmentInitiatives ? { government: "", status: "", beneficiaries: "" } : isOurTeam ? { qualification: "", email: "" } : isOurApproach ? { icon: "smartphone" } : isPrincipalInvestigator ? { label: "Principal Investigator", stats: [{ label: "Publications", value: "" }, { label: "Years Exp", value: "" }] } : isAboutAccordion ? { color: "primary" } : isFeatures ? { icon: "shield" } : undefined,
+        meta: isImpactStories ? { color: "primary", isHeader: false } : isCompetitionEvent ? { location: "", buttonText: "Register Now", color: "primary" } : isGovernmentInitiatives ? { government: "", status: "", beneficiaries: "" } : isOurTeam ? { qualification: "", email: "" } : isOurApproach ? { icon: "smartphone" } : isPrincipalInvestigator ? { label: "Principal Investigator", stats: [{ label: "Publications", value: "" }, { label: "Years Exp", value: "" }] } : isAboutAccordion ? { color: "primary" } : isFeatures ? { icon: "shield" } : isEventSection ? { status: "draft", expires_at: "" } : undefined,
         category_id: isNewsArticles ? (newsCategories[0]?.id || null) : undefined,
         category: isNewsArticles ? (newsCategories[0]?.name || "News") : undefined,
         subtitle: isCompetitionEvent ? "Event Date" : isGovernmentInitiatives ? "2026" : isOurTeam ? "Team Member" : isPrincipalInvestigator ? "Ph.D." : isAboutHeader ? "Discover our journey, mission, and the impact we're making in menstrual health education" : isAboutVideo ? "Learn about our mission" : isFeaturesHeader ? "Trusted by women across India for reliable, secure, and personalized menstrual health tracking" : isUpdatesHeader ? "Keep track of our latest activities, upcoming events, and important announcements" : isEventSection ? "Date" : undefined,
-        link_url: isCompetitionEvent ? "" : isAboutVideo ? "" : undefined,
+        link_url: isCompetitionEvent ? "" : isAboutVideo ? "" : isEventSection ? "" : undefined,
         sort_order: items.length,
       });
       setItems((prev) => [...prev, res.data]);
@@ -1774,13 +1774,70 @@ const PageEditor = () => {
                     />
                   )}
                   {isEventSection && (
-                    <textarea
-                      className="event-text"
-                      rows="3"
+                    <select
+                      className="event-status"
+                      value={item.meta?.status || "draft"}
+                      onChange={(e) => updateItemMetaField(item.id, "status", e.target.value)}
+                    >
+                      <option value="draft">Draft (hidden from site)</option>
+                      <option value="published">Published (visible on site)</option>
+                    </select>
+                  )}
+                  {isEventSection && (
+                    <label className="event-expiry-label">
+                      Expiry date (optional)
+                      <input
+                        className="event-expiry"
+                        type="date"
+                        value={item.meta?.expires_at || ""}
+                        onChange={(e) => updateItemMetaField(item.id, "expires_at", e.target.value)}
+                      />
+                    </label>
+                  )}
+                  {isEventSection && (
+                    <input
+                      className="event-title"
                       value={item.title || ""}
                       onChange={(e) => updateItemField(item.id, "title", e.target.value)}
-                      placeholder="Update text shown on the card"
+                      placeholder="Title / Heading"
                     />
+                  )}
+                  {isEventSection && (
+                    <input
+                      className="event-link"
+                      value={item.link_url || ""}
+                      onChange={(e) => updateItemField(item.id, "link_url", e.target.value)}
+                      placeholder='"Read More" link (external page, notice, or PDF - optional)'
+                    />
+                  )}
+                  {isEventSection && (
+                    <div className="impact-item-upload">
+                      <div className="impact-image-preview">
+                        {item.image_url ? (
+                          <img src={item.image_url} alt={item.title || "Update"} />
+                        ) : (
+                          <span>No Image</span>
+                        )}
+                      </div>
+                      <label className="upload-item-btn">
+                        {itemUploadingId === item.id ? "Uploading..." : "Upload Image (optional)"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => onItemUpload(item.id, e)}
+                          disabled={itemUploadingId === item.id}
+                        />
+                      </label>
+                      <span className="item-file-name">{getMediaFileName(item.image_url)}</span>
+                    </div>
+                  )}
+                  {isEventSection && (
+                    <div className="event-body">
+                      <RichTextEditor
+                        value={item.description || ""}
+                        onChange={(val) => updateItemField(item.id, "description", val)}
+                      />
+                    </div>
                   )}
                   {isEventSection && (
                     <input
@@ -2290,7 +2347,7 @@ const Wrap = styled.div`
   }
 
   .event-item-grid {
-    grid-template-columns: 150px 150px 100px;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
     align-items: start;
   }
 
@@ -2302,12 +2359,33 @@ const Wrap = styled.div`
     grid-column: 2;
   }
 
-  .event-sort {
+  .event-status {
     grid-column: 3;
   }
 
-  .event-text {
+  .event-expiry-label {
+    grid-column: 4;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--color-dark-600);
+  }
+
+  .event-title {
     grid-column: 1 / -1;
+  }
+
+  .event-link {
+    grid-column: 1 / -1;
+  }
+
+  .event-body {
+    grid-column: 1 / -1;
+  }
+
+  .event-sort {
+    grid-column: 1;
   }
 
   .impact-title {
