@@ -24,9 +24,17 @@ const getPreview = (value = "") => {
   return text.length > 92 ? `${text.slice(0, 92)}...` : text || "No story text";
 };
 
+const normalize = (value = "") =>
+  String(value)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ");
+
 const ImpactStorySubmissions = () => {
   const [status, setStatus] = useState("");
   const [rows, setRows] = useState([]);
+  const [publishedStories, setPublishedStories] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -38,9 +46,13 @@ const ImpactStorySubmissions = () => {
     setLoading(true);
     setError("");
     try {
-      const res = await adminApi.getImpactStorySubmissions({ status });
-      const nextRows = res.data || [];
+      const [submissionsRes, publishedRes] = await Promise.all([
+        adminApi.getImpactStorySubmissions({ status }),
+        adminApi.getItems("Impactstories", "impact_stories").catch(() => ({ data: [] })),
+      ]);
+      const nextRows = submissionsRes.data || [];
       setRows(nextRows);
+      setPublishedStories(publishedRes.data || []);
       if (!nextRows.some((row) => row.id === selectedId)) {
         setSelectedId(nextRows[0]?.id || "");
       }
@@ -55,6 +67,32 @@ const ImpactStorySubmissions = () => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
+
+  const findDuplicates = (submission) => {
+    if (!submission) return { submissions: [], stories: [] };
+    const email = normalize(submission.email);
+    const name = normalize(submission.full_name);
+    const title = normalize(submission.title);
+
+    const dupSubmissions = rows.filter((r) => {
+      if (r.id === submission.id) return false;
+      const rEmail = normalize(r.email);
+      const rName = normalize(r.full_name);
+      const rTitle = normalize(r.title);
+      return (email && rEmail === email) || (name && rName === name && title && rTitle === title);
+    });
+
+    const dupStories = publishedStories.filter((s) => {
+      if (s.meta?.submission_id === submission.id) return false;
+      const sTitle = normalize(s.title);
+      return title && sTitle === title;
+    });
+
+    return { submissions: dupSubmissions, stories: dupStories };
+  };
+
+  const duplicates = findDuplicates(selected);
+  const hasDuplicates = duplicates.submissions.length > 0 || duplicates.stories.length > 0;
 
   const updateStatus = async (nextStatus) => {
     if (!selected) return;
@@ -71,6 +109,12 @@ const ImpactStorySubmissions = () => {
 
   const publish = async () => {
     if (!selected) return;
+    if (hasDuplicates) {
+      const confirmed = window.confirm(
+        "This looks like it might already be published or submitted elsewhere. Publish anyway?"
+      );
+      if (!confirmed) return;
+    }
     setMessage("");
     setError("");
     try {
@@ -79,6 +123,23 @@ const ImpactStorySubmissions = () => {
       await load();
     } catch (err) {
       setError(err.message || "Failed to publish");
+    }
+  };
+
+  const unpublish = async () => {
+    if (!selected) return;
+    const confirmed = window.confirm(
+      `Remove "${selected.title}" from the live Impact Stories page? This deletes the published copy.`
+    );
+    if (!confirmed) return;
+    setMessage("");
+    setError("");
+    try {
+      const res = await adminApi.unpublishImpactStorySubmission(selected.id, "approved");
+      setMessage(res.message || "Removed from the live site.");
+      await load();
+    } catch (err) {
+      setError(err.message || "Failed to unpublish");
     }
   };
 
@@ -169,15 +230,56 @@ const ImpactStorySubmissions = () => {
                   <p><strong>Email</strong><span>{selected.email || "-"}</span></p>
                 </div>
 
+                {hasDuplicates && (
+                  <div className="dup-warning">
+                    <strong>⚠ Possible duplicate</strong>
+                    {duplicates.stories.length > 0 && (
+                      <p>
+                        A story with the same title is already <strong>published</strong>:{" "}
+                        {duplicates.stories.map((s) => `"${s.title}"`).join(", ")}
+                      </p>
+                    )}
+                    {duplicates.submissions.length > 0 && (
+                      <p>
+                        Matches other submission(s) by same email or name + title:{" "}
+                        {duplicates.submissions.map((s) => `"${s.title}" (${STATUS_LABELS[s.status] || s.status})`).join(", ")}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {selected.status === "published" && (
+                  <div className="live-note">
+                    This submission is live on the Impact Stories page. Approve/Reject/Reset only change this
+                    submission&apos;s label — they do <strong>not</strong> remove it from the site. Use
+                    &quot;Unpublish&quot; below to actually take it down.
+                  </div>
+                )}
+
                 {selected.image_url && <img src={selected.image_url} alt={selected.title} />}
                 <p className="story">{selected.story}</p>
 
                 <div className="actions">
-                  <button onClick={() => updateStatus("approved")}>Approve</button>
-                  <button onClick={() => updateStatus("rejected")}>Reject</button>
-                  <button onClick={() => updateStatus("pending")}>Reset</button>
-                  <button className="primary" onClick={publish}>Publish</button>
-                  <button className="danger" onClick={deleteSubmission}>Delete</button>
+                  {selected.status === "published" ? (
+                    <button className="danger" onClick={unpublish}>Unpublish (remove from live site)</button>
+                  ) : (
+                    <>
+                      <button onClick={() => updateStatus("approved")}>Approve</button>
+                      <button onClick={() => updateStatus("rejected")}>Reject</button>
+                      <button onClick={() => updateStatus("pending")}>Reset</button>
+                      <button className="primary" onClick={publish}>
+                        {hasDuplicates ? "Publish anyway" : "Publish"}
+                      </button>
+                    </>
+                  )}
+                  <button
+                    className="danger"
+                    onClick={deleteSubmission}
+                    disabled={selected.status === "published"}
+                    title={selected.status === "published" ? "Unpublish first to remove the live copy too" : undefined}
+                  >
+                    Delete
+                  </button>
                 </div>
               </>
             )}
@@ -426,6 +528,42 @@ const Wrap = styled.div`
   .info-grid span {
     color: #173848;
     overflow-wrap: anywhere;
+  }
+
+  .dup-warning {
+    background: #fff7ed;
+    border: 1px solid #fdba74;
+    border-radius: 12px;
+    color: #9a3412;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0 0 16px;
+    padding: 12px 14px;
+  }
+
+  .dup-warning strong {
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .dup-warning p {
+    margin: 4px 0 0;
+  }
+
+  .live-note {
+    background: #eff6ff;
+    border: 1px solid #93c5fd;
+    border-radius: 12px;
+    color: #1e3a8a;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0 0 16px;
+    padding: 12px 14px;
+  }
+
+  .actions button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
   }
 
   .detail img {

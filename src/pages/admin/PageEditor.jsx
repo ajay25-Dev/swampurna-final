@@ -32,6 +32,17 @@ const RichTextEditor = ({ value, onChange }) => {
     }
   };
 
+  // Pasting from Word/Google Docs/websites otherwise carries over inline style spans
+  // and can flatten paragraph breaks entirely. Paste plain text only, preserving line breaks.
+  const onPaste = (e) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData("text/plain");
+    document.execCommand("insertText", false, text);
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML);
+    }
+  };
+
   return (
     <div className="rte">
       <div className="rte-toolbar">
@@ -55,6 +66,7 @@ const RichTextEditor = ({ value, onChange }) => {
         contentEditable
         suppressContentEditableWarning
         onInput={(e) => onChange(e.currentTarget.innerHTML)}
+        onPaste={onPaste}
       />
     </div>
   );
@@ -74,10 +86,12 @@ const PageEditor = () => {
   const isGovernmentInitiatives = slug === "Governmentinitiatives";
   const isOurTeam = slug === "Ourteam";
   const isOurApproach = slug === "Ourapproach";
+  const isOurPartner = slug === "Ourpartner";
+  const isVolunteerOpportunity = slug === "Volunteerinternship";
   const isHome = slug === "Home";
   const contentSlug = isHome ? "home" : slug;
   const isMediaGallery = isPhotoGallery || isVideoGallery;
-  const isSpecialEditor = isMediaGallery || isImpactStory || isImpactStories || isNewsArticles || isFaqs || isCompetitionEvent || isMythsTaboos || isMenstrualProducts || isGovernmentInitiatives || isOurTeam || isOurApproach;
+  const isSpecialEditor = isMediaGallery || isImpactStory || isImpactStories || isNewsArticles || isFaqs || isCompetitionEvent || isMythsTaboos || isMenstrualProducts || isGovernmentInitiatives || isOurTeam || isOurApproach || isOurPartner || isVolunteerOpportunity;
   const [page, setPage] = useState({ title: "", hero_title: "", hero_subtitle: "", hero_image_url: "" });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -226,6 +240,20 @@ const PageEditor = () => {
   }, [isOurApproach, slug]);
 
   useEffect(() => {
+    if (!isOurPartner) return;
+    setSectionKey("partners");
+    loadItems("partners");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOurPartner, slug]);
+
+  useEffect(() => {
+    if (!isVolunteerOpportunity) return;
+    setSectionKey("volunteer_opportunities");
+    loadItems("volunteer_opportunities");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVolunteerOpportunity, slug]);
+
+  useEffect(() => {
     if (!isHome || !sectionKey) return;
     loadItems(sectionKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -370,19 +398,23 @@ const PageEditor = () => {
               ? "team_members"
             : isOurApproach
               ? "approach_items"
+            : isOurPartner
+              ? "partners"
+            : isVolunteerOpportunity
+              ? "volunteer_opportunities"
             : sectionKey;
       const res = await adminApi.createItem({
         page_slug: contentSlug,
         section_key: finalSectionKey,
-        title: isPhotoGallery ? "" : isVideoGallery ? "New Video" : isImpactStory ? "New Article" : isImpactStories ? "New Story" : isNewsArticles ? "New Article" : isFaqs ? "New question?" : isCompetitionEvent ? "New Event" : isMythsTaboos ? "New myth heading" : isMenstrualProducts ? "New Product" : isGovernmentInitiatives ? "New milestone title" : isOurTeam ? "New Team Member" : isOurApproach ? "New Approach Title" : isHeroImages ? "" : isPrincipalInvestigator ? "Dr. Full Name" : isAboutHeader ? "Know Who We Are" : isAboutAccordion ? "New accordion title" : isAboutVideo ? "Watch Our Story" : isFeaturesHeader ? "Why Millions of Women Choose Swampurna?" : isFeatures ? "New feature title" : isUpdatesHeader ? "News & Events" : isEventSection ? "New update text" : "New Item",
-        image_url: isPhotoGallery ? uploadUrl : isVideoGallery ? "" : (isImpactStory || isImpactStories || isNewsArticles || isCompetitionEvent || isMenstrualProducts || isOurTeam || isOurApproach || isHeroImages || isPrincipalInvestigator || isAboutVideo || isEventSection) ? "" : undefined,
-        description: isFaqs ? "New answer..." : isMenstrualProducts ? "" : isGovernmentInitiatives ? "" : isOurTeam ? "" : isOurApproach ? "" : (isPrincipalInvestigator || isAboutAccordion) ? "" : isFeatures ? "" : isEventSection ? "" : undefined,
-        tag: isFaqs ? "active" : isMythsTaboos ? "active" : isMenstrualProducts ? "primary" : isOurTeam ? "primary" : isOurApproach ? "primary" : isAboutHeader ? "About Swampurna" : isAboutAccordion ? "✨" : isFeatures ? "primary" : isFeaturesHeader ? "Why Choose Us" : isUpdatesHeader ? "Stay Updated" : isEventSection ? "Category" : undefined,
+        title: isPhotoGallery ? "" : isVideoGallery ? "New Video" : isImpactStory ? "New Article" : isImpactStories ? "New Story" : isNewsArticles ? "New Article" : isFaqs ? "New question?" : isCompetitionEvent ? "New Event" : isMythsTaboos ? "New myth heading" : isMenstrualProducts ? "New Product" : isGovernmentInitiatives ? "New milestone title" : isOurTeam ? "New Team Member" : isOurApproach ? "New Approach Title" : isOurPartner ? "New Partner Name" : isVolunteerOpportunity ? "New Opportunity Title" : isHeroImages ? "" : isPrincipalInvestigator ? "Dr. Full Name" : isAboutHeader ? "Know Who We Are" : isAboutAccordion ? "New accordion title" : isAboutVideo ? "Watch Our Story" : isFeaturesHeader ? "Why Millions of Women Choose Swampurna?" : isFeatures ? "New feature title" : isUpdatesHeader ? "News & Events" : isEventSection ? "New update text" : "New Item",
+        image_url: isPhotoGallery ? uploadUrl : isVideoGallery ? "" : (isImpactStory || isImpactStories || isNewsArticles || isCompetitionEvent || isMenstrualProducts || isOurTeam || isOurApproach || isOurPartner || isHeroImages || isPrincipalInvestigator || isAboutVideo || isEventSection) ? "" : undefined,
+        description: isFaqs ? "New answer..." : isMenstrualProducts ? "" : isGovernmentInitiatives ? "" : isOurTeam ? "" : isOurApproach ? "" : isOurPartner ? "" : isVolunteerOpportunity ? "" : (isPrincipalInvestigator || isAboutAccordion) ? "" : isFeatures ? "" : isEventSection ? "" : undefined,
+        tag: isFaqs ? "active" : isMythsTaboos ? "active" : isMenstrualProducts ? "primary" : isOurTeam ? "primary" : isOurApproach ? "primary" : isOurPartner ? "primary" : isVolunteerOpportunity ? "Volunteer" : isAboutHeader ? "About Swampurna" : isAboutAccordion ? "✨" : isFeatures ? "primary" : isFeaturesHeader ? "Why Choose Us" : isUpdatesHeader ? "Stay Updated" : isEventSection ? "Category" : undefined,
         meta: isImpactStories ? { color: "primary", isHeader: false } : isCompetitionEvent ? { location: "", buttonText: "Register Now", color: "primary" } : isGovernmentInitiatives ? { government: "", status: "", beneficiaries: "" } : isOurTeam ? { qualification: "", email: "" } : isOurApproach ? { icon: "smartphone" } : isPrincipalInvestigator ? { label: "Principal Investigator", stats: [{ label: "Publications", value: "" }, { label: "Years Exp", value: "" }] } : isAboutAccordion ? { color: "primary" } : isFeatures ? { icon: "shield" } : isEventSection ? { status: "draft", expires_at: "" } : undefined,
         category_id: isNewsArticles ? (newsCategories[0]?.id || null) : undefined,
         category: isNewsArticles ? (newsCategories[0]?.name || "News") : undefined,
-        subtitle: isCompetitionEvent ? "Event Date" : isGovernmentInitiatives ? "2026" : isOurTeam ? "Team Member" : isPrincipalInvestigator ? "Ph.D." : isAboutHeader ? "Discover our journey, mission, and the impact we're making in menstrual health education" : isAboutVideo ? "Learn about our mission" : isFeaturesHeader ? "Trusted by women across India for reliable, secure, and personalized menstrual health tracking" : isUpdatesHeader ? "Keep track of our latest activities, upcoming events, and important announcements" : isEventSection ? "Date" : undefined,
-        link_url: isCompetitionEvent ? "" : isAboutVideo ? "" : isEventSection ? "" : undefined,
+        subtitle: isCompetitionEvent ? "Event Date" : isGovernmentInitiatives ? "2026" : isOurTeam ? "Team Member" : isOurPartner ? "Technology & Design Partner" : isVolunteerOpportunity ? "Location / commitment" : isPrincipalInvestigator ? "Ph.D." : isAboutHeader ? "Discover our journey, mission, and the impact we're making in menstrual health education" : isAboutVideo ? "Learn about our mission" : isFeaturesHeader ? "Trusted by women across India for reliable, secure, and personalized menstrual health tracking" : isUpdatesHeader ? "Keep track of our latest activities, upcoming events, and important announcements" : isEventSection ? "Date" : undefined,
+        link_url: isCompetitionEvent ? "" : isAboutVideo ? "" : isEventSection ? "" : isVolunteerOpportunity ? "" : undefined,
         sort_order: items.length,
       });
       setItems((prev) => [...prev, res.data]);
@@ -513,7 +545,11 @@ const PageEditor = () => {
                                 ? "Add each team member with photo, name, role, qualification, designation, email and bio."
                                 : isOurApproach
                                   ? "Add each approach/objective with icon, image, title and description."
-                                  : isHeroImages
+                                  : isOurPartner
+                                    ? "Add each partner with logo, name, tagline and description."
+                                    : isVolunteerOpportunity
+                                      ? "Add each open Volunteer or Internship opportunity with type, title, details and an apply link."
+                                      : isHeroImages
                                     ? "Upload and reorder the homepage banner/slider images."
                                     : isPrincipalInvestigator
                                       ? "Edit the Principal Investigator profile shown on the homepage."
@@ -584,7 +620,7 @@ const PageEditor = () => {
             </div>
           )}
 
-          {!isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && !isHomeDedicated && (
+          {!isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && !isOurPartner && !isVolunteerOpportunity && !isHomeDedicated && (
             <div className="panel">
               <div className="panel-title">{isVideoGallery ? "Add Video URL" : "Media Upload"}</div>
               {isVideoGallery ? (
@@ -665,7 +701,11 @@ const PageEditor = () => {
                                   ? "Team Members"
                                   : isOurApproach
                                     ? "Approach Items"
-                                    : isHeroImages
+                                    : isOurPartner
+                                      ? "Partners"
+                                      : isVolunteerOpportunity
+                                        ? "Volunteer & Internship Opportunities"
+                                        : isHeroImages
                                       ? "Banner Images"
                                       : isPrincipalInvestigator
                                         ? "Principal Investigator Profile"
@@ -721,6 +761,10 @@ const PageEditor = () => {
                 <input value="team_members" readOnly />
               ) : isOurApproach ? (
                 <input value="approach_items" readOnly />
+              ) : isOurPartner ? (
+                <input value="partners" readOnly />
+              ) : isVolunteerOpportunity ? (
+                <input value="volunteer_opportunities" readOnly />
               ) : (
                 <input
                   placeholder="section key (e.g. core_values)"
@@ -760,6 +804,10 @@ const PageEditor = () => {
                       ? "Add Team Member"
                     : isOurApproach
                       ? "Add Approach"
+                    : isOurPartner
+                      ? "Add Partner"
+                    : isVolunteerOpportunity
+                      ? "Add Opportunity"
                     : isHeroImages
                       ? "Add Banner Image"
                     : isPrincipalInvestigator
@@ -794,7 +842,7 @@ const PageEditor = () => {
                   <div className="id">{item.id}</div>
                 </div>
                 <div
-                  className={`item-grid ${isPhotoGallery ? "gallery-item-grid" : ""} ${isVideoGallery ? "video-item-grid" : ""} ${isImpactStory || isImpactStories ? "impact-item-grid" : ""} ${isNewsArticles ? "news-item-grid" : ""} ${isFaqs ? "faq-item-grid" : ""} ${isCompetitionEvent ? "competition-item-grid" : ""} ${isMythsTaboos ? "myths-item-grid" : ""} ${isMenstrualProducts ? "product-item-grid" : ""} ${isGovernmentInitiatives ? "gov-item-grid" : ""} ${isOurTeam ? "team-item-grid" : ""} ${isOurApproach ? "approach-item-grid" : ""} ${isHeroImages ? "hero-item-grid" : ""} ${isPrincipalInvestigator ? "pi-item-grid" : ""} ${isAboutHeader ? "about-header-item-grid" : ""} ${isAboutAccordion ? "accordion-item-grid" : ""} ${isAboutVideo ? "about-video-item-grid" : ""} ${isFeaturesHeader ? "about-header-item-grid" : ""} ${isFeatures ? "feature-item-grid" : ""} ${isUpdatesHeader ? "about-header-item-grid" : ""} ${isEventSection ? "event-item-grid" : ""}`}
+                  className={`item-grid ${isPhotoGallery ? "gallery-item-grid" : ""} ${isVideoGallery ? "video-item-grid" : ""} ${isImpactStory || isImpactStories ? "impact-item-grid" : ""} ${isNewsArticles ? "news-item-grid" : ""} ${isFaqs ? "faq-item-grid" : ""} ${isCompetitionEvent ? "competition-item-grid" : ""} ${isMythsTaboos ? "myths-item-grid" : ""} ${isMenstrualProducts ? "product-item-grid" : ""} ${isGovernmentInitiatives ? "gov-item-grid" : ""} ${isOurTeam ? "team-item-grid" : ""} ${isOurApproach ? "approach-item-grid" : ""} ${isHeroImages ? "hero-item-grid" : ""} ${isPrincipalInvestigator ? "pi-item-grid" : ""} ${isAboutHeader ? "about-header-item-grid" : ""} ${isAboutAccordion ? "accordion-item-grid" : ""} ${isAboutVideo ? "about-video-item-grid" : ""} ${isFeaturesHeader ? "about-header-item-grid" : ""} ${isFeatures ? "feature-item-grid" : ""} ${isUpdatesHeader ? "about-header-item-grid" : ""} ${isEventSection ? "event-item-grid" : ""} ${isOurPartner ? "partner-item-grid" : ""} ${isVolunteerOpportunity ? "opportunity-item-grid" : ""}`}
                 >
                   {isPhotoGallery && (
                     <div className="gallery-preview">
@@ -1462,6 +1510,124 @@ const PageEditor = () => {
                       placeholder="Sort Order"
                     />
                   )}
+                  {isOurPartner && (
+                    <div className="impact-item-upload">
+                      <div className="impact-image-preview">
+                        {item.image_url ? (
+                          <img src={item.image_url} alt={item.title || "Partner logo"} />
+                        ) : (
+                          <span>No Logo</span>
+                        )}
+                      </div>
+                      <label className="upload-item-btn">
+                        {itemUploadingId === item.id ? "Uploading..." : "Upload Logo"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => onItemUpload(item.id, e)}
+                          disabled={itemUploadingId === item.id}
+                        />
+                      </label>
+                      <span className="item-file-name">{getMediaFileName(item.image_url)}</span>
+                    </div>
+                  )}
+                  {isOurPartner && (
+                    <input
+                      className="partner-name"
+                      value={item.title || ""}
+                      onChange={(e) => updateItemField(item.id, "title", e.target.value)}
+                      placeholder="Partner name (e.g. Creative Agency)"
+                    />
+                  )}
+                  {isOurPartner && (
+                    <input
+                      className="partner-tagline"
+                      value={item.subtitle || ""}
+                      onChange={(e) => updateItemField(item.id, "subtitle", e.target.value)}
+                      placeholder="Tagline / role (e.g. Technology & Design Partner)"
+                    />
+                  )}
+                  {isOurPartner && (
+                    <select
+                      className="partner-color"
+                      value={item.tag || "primary"}
+                      onChange={(e) => updateItemField(item.id, "tag", e.target.value)}
+                    >
+                      <option value="primary">Primary</option>
+                      <option value="secondary">Secondary</option>
+                      <option value="accent">Accent</option>
+                    </select>
+                  )}
+                  {isOurPartner && (
+                    <textarea
+                      className="partner-description"
+                      rows="5"
+                      value={item.description || ""}
+                      onChange={(e) => updateItemField(item.id, "description", e.target.value)}
+                      placeholder="Description of the partnership and how they support us"
+                    />
+                  )}
+                  {isOurPartner && (
+                    <input
+                      className="partner-sort"
+                      type="number"
+                      value={item.sort_order ?? 0}
+                      onChange={(e) => updateItemField(item.id, "sort_order", Number(e.target.value))}
+                      placeholder="Sort Order"
+                    />
+                  )}
+                  {isVolunteerOpportunity && (
+                    <select
+                      className="opportunity-type"
+                      value={item.tag || "Volunteer"}
+                      onChange={(e) => updateItemField(item.id, "tag", e.target.value)}
+                    >
+                      <option value="Volunteer">Volunteer</option>
+                      <option value="Internship">Internship</option>
+                    </select>
+                  )}
+                  {isVolunteerOpportunity && (
+                    <input
+                      className="opportunity-title"
+                      value={item.title || ""}
+                      onChange={(e) => updateItemField(item.id, "title", e.target.value)}
+                      placeholder="Role title (e.g. Content Volunteer)"
+                    />
+                  )}
+                  {isVolunteerOpportunity && (
+                    <input
+                      className="opportunity-meta"
+                      value={item.subtitle || ""}
+                      onChange={(e) => updateItemField(item.id, "subtitle", e.target.value)}
+                      placeholder="Location / commitment (e.g. Remote, 3 months)"
+                    />
+                  )}
+                  {isVolunteerOpportunity && (
+                    <input
+                      className="opportunity-link"
+                      value={item.link_url || ""}
+                      onChange={(e) => updateItemField(item.id, "link_url", e.target.value)}
+                      placeholder="Apply link (optional - falls back to Contact Us)"
+                    />
+                  )}
+                  {isVolunteerOpportunity && (
+                    <textarea
+                      className="opportunity-description"
+                      rows="5"
+                      value={item.description || ""}
+                      onChange={(e) => updateItemField(item.id, "description", e.target.value)}
+                      placeholder="Role details and responsibilities"
+                    />
+                  )}
+                  {isVolunteerOpportunity && (
+                    <input
+                      className="opportunity-sort"
+                      type="number"
+                      value={item.sort_order ?? 0}
+                      onChange={(e) => updateItemField(item.id, "sort_order", Number(e.target.value))}
+                      placeholder="Sort Order"
+                    />
+                  )}
                   {isHeroImages && (
                     <div className="gallery-preview">
                       {item.image_url ? (
@@ -1848,21 +2014,21 @@ const PageEditor = () => {
                       placeholder="Sort Order"
                     />
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && !isHomeDedicated && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && !isOurPartner && !isVolunteerOpportunity && !isHomeDedicated && (
                     <input
                       value={item.title || ""}
                       onChange={(e) => updateItemField(item.id, "title", e.target.value)}
                       placeholder="Title"
                     />
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && !isHomeDedicated && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && !isOurPartner && !isVolunteerOpportunity && !isHomeDedicated && (
                     <input
                       value={item.subtitle || ""}
                       onChange={(e) => updateItemField(item.id, "subtitle", e.target.value)}
                       placeholder="Subtitle"
                     />
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && !isHomeDedicated && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && !isOurPartner && !isVolunteerOpportunity && !isHomeDedicated && (
                     <textarea
                       rows="3"
                       value={item.description || ""}
@@ -1870,28 +2036,28 @@ const PageEditor = () => {
                       placeholder="Description"
                     />
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && !isHomeDedicated && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && !isOurPartner && !isVolunteerOpportunity && !isHomeDedicated && (
                     <input
                       value={item.image_url || ""}
                       onChange={(e) => updateItemField(item.id, "image_url", e.target.value)}
                       placeholder="Image URL"
                     />
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && !isHomeDedicated && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && !isOurPartner && !isVolunteerOpportunity && !isHomeDedicated && (
                     <input
                       value={item.link_url || ""}
                       onChange={(e) => updateItemField(item.id, "link_url", e.target.value)}
                       placeholder="Link URL"
                     />
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && !isHomeDedicated && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && !isOurPartner && !isVolunteerOpportunity && !isHomeDedicated && (
                     <input
                       value={item.tag || ""}
                       onChange={(e) => updateItemField(item.id, "tag", e.target.value)}
                       placeholder="Tag"
                     />
                   )}
-                  {!isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && !isHomeDedicated && (
+                  {!isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && !isOurPartner && !isVolunteerOpportunity && !isHomeDedicated && (
                     <input
                       type="number"
                       value={item.sort_order ?? 0}
@@ -1908,7 +2074,7 @@ const PageEditor = () => {
                       placeholder="Sort Order"
                     />
                   )}
-                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && !isHomeDedicated && (
+                  {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && !isOurPartner && !isVolunteerOpportunity && !isHomeDedicated && (
                     <textarea
                       rows="3"
                       value={item.meta ? JSON.stringify(item.meta) : ""}
@@ -2261,6 +2427,60 @@ const Wrap = styled.div`
 
   .approach-sort {
     grid-column: 1;
+  }
+
+  .partner-item-grid {
+    grid-template-columns: 160px minmax(0, 1fr) 140px 100px;
+    align-items: start;
+  }
+
+  .partner-name {
+    grid-column: 2;
+  }
+
+  .partner-tagline {
+    grid-column: 3;
+  }
+
+  .partner-color {
+    grid-column: 4;
+  }
+
+  .partner-description {
+    grid-column: 1 / -1;
+  }
+
+  .partner-sort {
+    grid-column: 1;
+  }
+
+  .opportunity-item-grid {
+    grid-template-columns: 140px minmax(0, 1fr) 180px 100px;
+    align-items: start;
+  }
+
+  .opportunity-type {
+    grid-column: 1;
+  }
+
+  .opportunity-title {
+    grid-column: 2;
+  }
+
+  .opportunity-meta {
+    grid-column: 3;
+  }
+
+  .opportunity-sort {
+    grid-column: 4;
+  }
+
+  .opportunity-link {
+    grid-column: 1 / -1;
+  }
+
+  .opportunity-description {
+    grid-column: 1 / -1;
   }
 
   .hero-item-grid {
@@ -2671,6 +2891,11 @@ const Wrap = styled.div`
     }
 
     .approach-item-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .partner-item-grid,
+    .opportunity-item-grid {
       grid-template-columns: 1fr;
     }
 

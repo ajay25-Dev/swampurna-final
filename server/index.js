@@ -1604,6 +1604,59 @@ app.post("/api/admin/impactstories/submissions/:id/publish", authRequired, async
   return res.json({ message: "Story published", data: item });
 });
 
+app.post("/api/admin/impactstories/submissions/:id/unpublish", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const { data: submission, error: fetchErr } = await supabase
+    .from("impact_story_submissions")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (fetchErr || !submission) {
+    if (isMissingImpactStorySubmissionsTable(fetchErr)) {
+      return res.status(503).json(impactStorySubmissionsSetupError());
+    }
+    return res.status(404).json({ error: "Submission not found" });
+  }
+  if (submission.status !== "published") {
+    return res.status(400).json({ error: "This submission is not currently published" });
+  }
+
+  const { data: liveItems, error: findErr } = await supabase
+    .from("content_items")
+    .select("id, meta")
+    .eq("page_slug", "Impactstories")
+    .eq("section_key", "impact_stories");
+  if (findErr) return res.status(400).json({ error: findErr.message });
+
+  const matchingIds = (liveItems || [])
+    .filter((row) => row.meta?.submission_id === id)
+    .map((row) => row.id);
+
+  if (matchingIds.length > 0) {
+    const { error: deleteErr } = await supabase
+      .from("content_items")
+      .delete()
+      .in("id", matchingIds);
+    if (deleteErr) return res.status(400).json({ error: deleteErr.message });
+  }
+
+  const nextStatus = String(req.body?.status || "approved").trim().toLowerCase();
+  const finalStatus = ["pending", "approved", "rejected"].includes(nextStatus) ? nextStatus : "approved";
+
+  const { data: updated, error: statusErr } = await supabase
+    .from("impact_story_submissions")
+    .update({ status: finalStatus })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (statusErr) return res.status(400).json({ error: statusErr.message });
+
+  return res.json({
+    message: matchingIds.length > 0 ? "Story removed from the live site." : "Marked as unpublished (no live copy was found).",
+    data: updated,
+  });
+});
+
 app.get("/api/v1/testimonials", async (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
   const offset = Math.max(Number(req.query.offset) || 0, 0);

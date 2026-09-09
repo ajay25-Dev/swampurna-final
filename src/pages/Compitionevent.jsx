@@ -59,6 +59,15 @@ function eventSlug(event, index) {
   return base;
 }
 
+function plainText(content) {
+  return String(content || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function excerpt(content, limit = 140) {
+  const text = plainText(content);
+  return text.length > limit ? `${text.slice(0, limit)}...` : text;
+}
+
 const Compitionevent = () => {
   const { items } = useContentItems({
     page: 'Compitionevent',
@@ -100,7 +109,7 @@ const Compitionevent = () => {
                   <div className="meta-item"><FiCalendar /><span>{event.subtitle}</span></div>
                   <div className="meta-item"><FiMapPin /><span>{event.meta?.location || 'TBA'}</span></div>
                 </div>
-                <p>{event.description}</p>
+                <p>{excerpt(event.description)}</p>
                 <Link to={`/Compitionevent/${eventSlug(event, index)}`} className={`event-button color-${color}`}>
                   <span>{event.meta?.buttonText || 'View Details'}</span>
                   <FiArrowRight />
@@ -139,7 +148,14 @@ const EventCard = styled.article`
   border-radius: var(--radius-2xl);
   overflow: hidden;
   border: 1px solid var(--color-dark-100);
+  box-shadow: var(--shadow-soft);
+  transition: all var(--transition-base);
   display: flex;
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-soft-lg);
+  }
   flex-direction: column;
   .event-image { position: relative; height: 180px; }
   .event-image img { width: 100%; height: 100%; object-fit: cover; }
@@ -152,7 +168,33 @@ const EventCard = styled.article`
   .event-meta { display: grid; gap: 6px; }
   .meta-item { display: flex; gap: 6px; align-items: center; color: var(--color-dark-500); font-size: var(--text-sm); }
   p { color: var(--color-dark-500); line-height: 1.7; margin: 0; }
-  .event-button { margin-top: auto; display: inline-flex; align-items: center; gap: 8px; padding: var(--space-3) var(--space-5); border-radius: var(--radius-full); color: #fff; font-weight: 600; }
+  .event-button {
+    margin-top: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: var(--space-3) var(--space-5);
+    border-radius: var(--radius-full);
+    color: #fff;
+    font-weight: 600;
+    font-size: var(--text-sm);
+    box-shadow: var(--shadow-md);
+    transition: all var(--transition-base);
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    svg {
+      transition: transform var(--transition-base);
+    }
+
+    &:hover svg {
+      transform: translateX(3px);
+    }
+  }
   .event-button.color-primary { background: var(--gradient-primary); }
   .event-button.color-secondary { background: var(--gradient-secondary); }
   .event-button.color-accent { background: var(--gradient-accent); color: var(--color-dark-900); }

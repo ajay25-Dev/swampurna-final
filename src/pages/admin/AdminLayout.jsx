@@ -28,7 +28,7 @@ const AdminLayout = ({ children }) => {
       ["Whoweare", "Missionvision", "Ourteam", "Ourpartner", "Projecthistory"].includes(slug)
     ) {
       setOpenMenu("about");
-    } else if (["Programinitiative", "Ourapproach", "Impactstories"].includes(slug)) {
+    } else if (["Programinitiative", "Ourapproach", "Impactstories", "Volunteerinternship"].includes(slug)) {
       setOpenMenu("work");
     } else if (
       ["Guidetomenstrualhealth", "Menstrualproducts", "Governmentinitiatives", "Mythstaboos", "Compitionevent", "Faqs"].includes(slug)
@@ -140,6 +140,7 @@ const AdminLayout = ({ children }) => {
               <NavLink to="/admin/pages/Programinitiative" className="nav-link" onClick={() => setSidebarOpen(false)}>Programinitiative</NavLink>
               <NavLink to="/admin/pages/Ourapproach" className="nav-link" onClick={() => setSidebarOpen(false)}>Ourapproach</NavLink>
               <NavLink to="/admin/pages/Impactstories" className="nav-link" onClick={() => setSidebarOpen(false)}>Impactstories</NavLink>
+              <NavLink to="/admin/pages/Volunteerinternship" className="nav-link" onClick={() => setSidebarOpen(false)}>Volunteerinternship</NavLink>
             </div>
           </div>
 

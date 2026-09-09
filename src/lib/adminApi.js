@@ -129,6 +129,11 @@ export const adminApi = {
     request(`/api/admin/impactstories/submissions/${id}/publish`, {
       method: "POST",
     }),
+  unpublishImpactStorySubmission: (id, status = "approved") =>
+    request(`/api/admin/impactstories/submissions/${id}/unpublish`, {
+      method: "POST",
+      body: JSON.stringify({ status }),
+    }),
   deleteImpactStorySubmission: (id) =>
     request(`/api/admin/impactstories/submissions/${id}`, {
       method: "DELETE",

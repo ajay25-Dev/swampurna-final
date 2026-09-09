@@ -5,21 +5,77 @@ import ImpactStoryImg1 from '../assets/images/images1/ImpactStoryimg1.jpg';
 import ImpactStoryImg2 from '../assets/images/images1/ImpactStoryimg2.jpg';
 
 const Impactstory = () => {
-  const [expandedCards, setExpandedCards] = useState({});
+  const [selectedStory, setSelectedStory] = useState(null);
 
-  const toggleExpanded = (key) => {
-    setExpandedCards((prev) => ({ ...prev, [key]: !prev[key] }));
+  const escapeHtml = (value) =>
+    String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+  // Only trust text that still has a tag after noise-stripping - it's real inline
+  // formatting (bold/italic) from the editor, not paste artifacts, so don't escape it.
+  const escapeIfPlain = (text) => (/<[a-z][^>]*>/i.test(text) ? text : escapeHtml(text));
+
+  // Some entries were pasted from elsewhere and picked up junk inline-style spans/fonts
+  // with no real paragraph structure at all. Unwrap those noise tags, keep their text.
+  const stripNoiseTags = (html) =>
+    String(html || '')
+      .replace(/<\/?span[^>]*>/gi, '')
+      .replace(/<\/?font[^>]*>/gi, '');
+
+  const hasBlockTags = (html) => /<(p|div|li|ul|ol|h[1-6])[\s>]/i.test(html);
+
+  const HEAD_DELIM = '@@HEADING@@';
+
+  // Recovers short "The X Y" headings (e.g. "The Challenge", "The Transformation") that
+  // got pasted with no line break around them, so "...begins. The Impact By engaging..."
+  // becomes its own bolded line instead of running straight into the next sentence.
+  const markEmbeddedHeadings = (text) =>
+    text.replace(
+      /([.!?])\s+(The(?:\s+[A-Z][A-Za-z]*){1,3})\s+(?=[A-Z])/g,
+      (_m, punct, heading) => `${punct}${HEAD_DELIM}${heading}${HEAD_DELIM}`
+    );
+
+  // Turns "...to: • Step one. • Step two." (bullets typed inline, no line breaks) into a
+  // real <ul><li> list, keeping any lead-in sentence as its own paragraph.
+  const renderProseWithBullets = (text) => {
+    const trimmed = text.trim();
+    if (!trimmed) return '';
+    const bulletParts = trimmed.split(/\s*•\s*/).map((p) => p.trim()).filter(Boolean);
+    if (bulletParts.length < 2) {
+      return `<p>${escapeIfPlain(trimmed)}</p>`;
+    }
+    const [intro, ...items] = bulletParts;
+    const introHtml = intro ? `<p>${escapeIfPlain(intro)}</p>` : '';
+    const itemsHtml = `<ul>${items.map((item) => `<li>${escapeIfPlain(item)}</li>`).join('')}</ul>`;
+    return `${introHtml}${itemsHtml}`;
   };
 
   const toHtml = (content) => {
-    const value = String(content || '');
-    if (!value) return '';
-    if (/<[a-z][\s\S]*>/i.test(value)) return value;
-    return value
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/\n/g, '<br/>');
+    const cleaned = stripNoiseTags(content).trim();
+    if (!cleaned) return '';
+
+    // Already properly structured (real paragraphs/lists from the rich text editor) - trust it.
+    if (hasBlockTags(cleaned)) return cleaned;
+
+    // Otherwise it's flattened plain text (possibly with "\n" paragraph breaks, "•" bullets,
+    // and headings run straight into the next sentence) - rebuild it into readable HTML.
+    return cleaned
+      .split(/\n+/)
+      .map((block) => block.trim())
+      .filter(Boolean)
+      .map((block) =>
+        markEmbeddedHeadings(block)
+          .split(HEAD_DELIM)
+          .map((chunk, i) =>
+            i % 2 === 1
+              ? `<p><strong>${escapeIfPlain(chunk.trim())}</strong></p>`
+              : renderProseWithBullets(chunk)
+          )
+          .join('')
+      )
+      .join('');
   };
 
   const plainText = (content) => String(content || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
@@ -128,7 +184,7 @@ By engaging her mother, Komal, and by participating in our colorful, activity-ba
           Impact <span className="title-accent">Story</span>
         </h1>
         <p className="hero-description">
-          Get in Touch with SWAMPURNA. Whether you have questions about our programs, want to volunteer, or are interested in collaborating with us, we'd love to hear from you! Use any of the options below to reach us, and we'll get back to you as soon as possible.
+          Get in Touch with SWAMPURNA. Whether you have questions about our programs, want to volunteer, or are interested in collaborating with us, we&apos;d love to hear from you! Use any of the options below to reach us, and we&apos;ll get back to you as soon as possible.
         </p>
       </HeroSection>
 
@@ -136,7 +192,6 @@ By engaging her mother, Komal, and by participating in our colorful, activity-ba
       <StoriesGrid>
         {stories.map((story, index) => {
           const key = story.id || index;
-          const isExpanded = !!expandedCards[key];
           const showMoreNeeded = plainText(story.description).length > 280;
           return (
             <StoryCard key={key} className={`color-${story.color}`}>
@@ -147,17 +202,10 @@ By engaging her mother, Komal, and by participating in our colorful, activity-ba
               )}
               <div className="story-content">
                 <h3 className="story-title">{story.title}</h3>
-                {isExpanded ? (
-                  <div
-                    className="story-description"
-                    dangerouslySetInnerHTML={{ __html: toHtml(story.description) }}
-                  />
-                ) : (
-                  <p className="story-description">{excerpt(story.description)}</p>
-                )}
+                <p className="story-description">{excerpt(story.description)}</p>
                 {showMoreNeeded && (
-                  <button type="button" className="show-more-btn" onClick={() => toggleExpanded(key)}>
-                    {isExpanded ? 'Show Less' : 'Show More'}
+                  <button type="button" className="show-more-btn" onClick={() => setSelectedStory(story)}>
+                    Show More
                   </button>
                 )}
               </div>
@@ -165,6 +213,26 @@ By engaging her mother, Komal, and by participating in our colorful, activity-ba
           );
         })}
       </StoriesGrid>
+
+      {selectedStory && (
+        <ModalOverlay onClick={() => setSelectedStory(null)}>
+          <ModalCard className={`color-${selectedStory.color}`} onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="modal-close" onClick={() => setSelectedStory(null)} aria-label="Close">
+              &times;
+            </button>
+            {selectedStory.image_url && (
+              <div className="modal-image">
+                <img src={selectedStory.image_url} alt={selectedStory.title} />
+              </div>
+            )}
+            <h3 className="modal-title">{selectedStory.title}</h3>
+            <div
+              className="modal-description"
+              dangerouslySetInnerHTML={{ __html: toHtml(selectedStory.description) }}
+            />
+          </ModalCard>
+        </ModalOverlay>
+      )}
     </PageWrapper>
   );
 };
@@ -369,6 +437,129 @@ const StoryCard = styled.article`
 
     .story-content {
       padding: var(--space-5);
+    }
+  }
+`;
+
+const ModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 15, 20, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  z-index: 2000;
+`;
+
+const ModalCard = styled.div`
+  position: relative;
+  background: white;
+  border-radius: var(--radius-3xl);
+  max-width: 720px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  border-top: 6px solid;
+  box-shadow: var(--shadow-xl);
+
+  &.color-primary {
+    border-top-color: var(--color-primary-500);
+  }
+
+  &.color-secondary {
+    border-top-color: var(--color-secondary-500);
+  }
+
+  &.color-accent {
+    border-top-color: var(--color-accent-500);
+  }
+
+  .modal-close {
+    position: absolute;
+    top: var(--space-4);
+    right: var(--space-4);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: white;
+    color: var(--color-dark-700);
+    font-size: 1.4rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-md);
+    z-index: 1;
+
+    &:hover {
+      background: var(--color-dark-50);
+    }
+  }
+
+  .modal-image {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: var(--color-dark-50);
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+  }
+
+  .modal-title {
+    font-family: var(--font-heading);
+    font-size: var(--text-2xl);
+    font-weight: 600;
+    color: var(--color-dark-900);
+    margin: var(--space-6) var(--space-6) var(--space-4);
+  }
+
+  .modal-description {
+    font-size: var(--text-base);
+    color: var(--color-dark-600);
+    line-height: 1.8;
+    padding: 0 var(--space-6) var(--space-6);
+
+    p {
+      margin: 0 0 var(--space-3);
+    }
+
+    ul,
+    ol {
+      margin: 0 0 var(--space-4) var(--space-5);
+      display: block;
+    }
+
+    ul {
+      list-style: disc;
+    }
+
+    ol {
+      list-style: decimal;
+    }
+
+    li {
+      display: list-item;
+      margin: 0 0 var(--space-2);
+    }
+
+    strong {
+      color: var(--color-dark-800);
+    }
+  }
+
+  @media (max-width: 640px) {
+    .modal-title {
+      margin: var(--space-5) var(--space-5) var(--space-3);
+      font-size: var(--text-xl);
+    }
+
+    .modal-description {
+      padding: 0 var(--space-5) var(--space-5);
     }
   }
 `;

@@ -1,9 +1,27 @@
 import React from 'react';
 import styled from 'styled-components';
 import { Link } from 'react-router-dom';
-import { FiUsers, FiArrowRight } from 'react-icons/fi';
+import { FiUsers, FiArrowRight, FiMapPin } from 'react-icons/fi';
+import { useContentItems } from '../hooks/useContentItems';
+
+function plainText(content) {
+  return String(content || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function excerpt(content, limit = 160) {
+  const text = plainText(content);
+  return text.length > limit ? `${text.slice(0, limit)}...` : text;
+}
 
 const Volunteerinternship = () => {
+  const { items } = useContentItems({
+    page: 'Volunteerinternship',
+    section: 'volunteer_opportunities',
+    fallback: [],
+  });
+
+  const opportunities = items || [];
+
   return (
     <PageWrapper>
       {/* Background Decoration */}
@@ -26,11 +44,41 @@ const Volunteerinternship = () => {
         </p>
       </HeroSection>
 
+      {/* Open Opportunities */}
+      {opportunities.length > 0 && (
+        <OpportunitiesGrid>
+          {opportunities.map((opp, index) => (
+            <OpportunityCard key={opp.id || index} className={opp.tag === 'Internship' ? 'internship' : 'volunteer'}>
+              <span className="opp-badge">{opp.tag || 'Volunteer'}</span>
+              <h3>{opp.title}</h3>
+              {opp.subtitle && (
+                <div className="opp-meta">
+                  <FiMapPin />
+                  <span>{opp.subtitle}</span>
+                </div>
+              )}
+              <p>{excerpt(opp.description)}</p>
+              {opp.link_url ? (
+                <a className="opp-apply" href={opp.link_url} target="_blank" rel="noopener noreferrer">
+                  <span>Apply Now</span>
+                  <FiArrowRight />
+                </a>
+              ) : (
+                <Link className="opp-apply" to="/Contactus">
+                  <span>Apply Now</span>
+                  <FiArrowRight />
+                </Link>
+              )}
+            </OpportunityCard>
+          ))}
+        </OpportunitiesGrid>
+      )}
+
       {/* CTA Section */}
       <CTASection>
         <h2>Ready to Make a Difference?</h2>
         <p>
-          Whether you're a student looking for an internship, a professional wanting to volunteer, or someone passionate about menstrual health, we'd love to have you on board.
+          Whether you&apos;re a student looking for an internship, a professional wanting to volunteer, or someone passionate about menstrual health, we&apos;d love to have you on board.
         </p>
         <Link to="/Contactus" className="cta-button">
           <span>Get in Touch</span>
@@ -141,6 +189,96 @@ const HeroSection = styled.section`
   @media (max-width: 768px) {
     .hero-title {
       font-size: var(--text-4xl);
+    }
+  }
+`;
+
+const OpportunitiesGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-6);
+  margin-bottom: var(--space-12);
+`;
+
+const OpportunityCard = styled.article`
+  background: white;
+  border-radius: var(--radius-2xl);
+  padding: var(--space-6);
+  border: 1px solid var(--color-dark-100);
+  box-shadow: var(--shadow-soft);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  transition: all var(--transition-base);
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-soft-lg);
+  }
+
+  .opp-badge {
+    align-self: flex-start;
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-radius: var(--radius-full);
+  }
+
+  &.volunteer .opp-badge {
+    background: var(--color-secondary-50);
+    color: var(--color-secondary-700);
+  }
+
+  &.internship .opp-badge {
+    background: var(--color-primary-50);
+    color: var(--color-primary-700);
+  }
+
+  h3 {
+    font-family: var(--font-heading);
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--color-dark-900);
+    margin: 0;
+  }
+
+  .opp-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: var(--text-sm);
+    color: var(--color-dark-500);
+  }
+
+  p {
+    font-size: var(--text-sm);
+    color: var(--color-dark-600);
+    line-height: 1.7;
+    margin: 0;
+    flex: 1;
+  }
+
+  .opp-apply {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-5);
+    background: var(--gradient-primary);
+    color: white;
+    font-weight: 600;
+    font-size: var(--text-sm);
+    border-radius: var(--radius-full);
+    box-shadow: var(--shadow-md);
+    transition: all var(--transition-base);
+    text-decoration: none;
+    align-self: flex-start;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
     }
   }
 `;

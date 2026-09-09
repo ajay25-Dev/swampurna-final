@@ -1,8 +1,27 @@
 import React from 'react';
 import styled from 'styled-components';
 import { FiStar, FiSmartphone, FiLayers, FiShield, FiRefreshCw, FiUsers } from 'react-icons/fi';
+import { useContentItems } from '../hooks/useContentItems';
+
+const fallbackPartners = [
+  {
+    title: 'Creative Agency',
+    subtitle: 'Technology & Design Partner',
+    tag: 'primary',
+    description:
+      'Creative Agency is our trusted development partner, working closely with the SWAMPURNA team to bring our vision into reality. With strong expertise in mobile app development, UI/UX design, animation integration, and interactive learning experiences, Creative Agency helps us transform complex educational content into simple, engaging, and user-friendly digital solutions. Their experience with social impact projects and youth-focused digital platforms makes them a valuable contributor to the SWAMPURNA mission.',
+  },
+];
 
 const Ourpartner = () => {
+  const { items } = useContentItems({
+    page: 'Ourpartner',
+    section: 'partners',
+    fallback: fallbackPartners,
+  });
+
+  const partners = items || [];
+
   const supportAreas = [
     {
       icon: FiSmartphone,
@@ -40,42 +59,50 @@ const Ourpartner = () => {
 
       {/* Hero Section */}
       <HeroSection>
-        <span className="section-eyebrow">Our Partner</span>
+        <span className="section-eyebrow">Our Partners</span>
         <h1 className="hero-title">
           <FiStar className="star-icon" />
-          Creative <span className="title-accent">Agency</span>
+          Our <span className="title-accent">Partners</span>
         </h1>
         <p className="hero-description">
-          Creative Agency is our trusted development partner, working closely with the SWAMPURNA team to bring our vision into reality. With strong expertise in mobile app development, UI/UX design, animation integration, and interactive learning experiences, Creative Agency helps us transform complex educational content into simple, engaging, and user-friendly digital solutions.
+          SWAMPURNA works hand in hand with trusted organizations who share our vision of accessible,
+          stigma-free menstrual health education. Meet the partners helping us bring that vision to life.
         </p>
       </HeroSection>
 
-      {/* Main Partner Section */}
-      <PartnerSection>
-        <div className="partner-intro">
-          <p>
-            They understand the sensitivity and importance of menstrual health education, and they support us by:
-          </p>
-        </div>
-
-        <SupportAreasGrid>
-          {supportAreas.map((area, index) => (
-            <SupportCard key={index} className={`color-${area.color}`}>
-              <div className={`icon-wrapper color-${area.color}`}>
-                <area.icon />
+      {/* Partners List */}
+      {partners.map((partner, index) => (
+        <PartnerSection key={partner.id || index}>
+          <div className="partner-head">
+            {partner.image_url && (
+              <div className="partner-logo">
+                <img src={partner.image_url} alt={partner.title} />
               </div>
-              <h3>{area.title}</h3>
-              <p>{area.description}</p>
-            </SupportCard>
-          ))}
-        </SupportAreasGrid>
+            )}
+            <div>
+              <h2>{partner.title}</h2>
+              {partner.subtitle && <span className={`partner-tag color-${partner.tag || 'primary'}`}>{partner.subtitle}</span>}
+            </div>
+          </div>
+          <div className="partner-intro">
+            <p>{partner.description}</p>
+          </div>
 
-        <ConclusionSection>
-          <p>
-            Their experience with social impact projects and youth-focused digital platforms makes them a valuable contributor to the SWAMPURNA mission. Together, we aim to create a platform that is educational, inclusive, and empowering for every girl and community we serve.
-          </p>
-        </ConclusionSection>
-      </PartnerSection>
+          {index === 0 && (
+            <SupportAreasGrid>
+              {supportAreas.map((area, i) => (
+                <SupportCard key={i} className={`color-${area.color}`}>
+                  <div className={`icon-wrapper color-${area.color}`}>
+                    <area.icon />
+                  </div>
+                  <h3>{area.title}</h3>
+                  <p>{area.description}</p>
+                </SupportCard>
+              ))}
+            </SupportAreasGrid>
+          )}
+        </PartnerSection>
+      ))}
     </PageWrapper>
   );
 };
@@ -213,6 +240,62 @@ const PartnerSection = styled.section`
   border: 1px solid var(--color-dark-100);
   margin-bottom: var(--space-8);
 
+  .partner-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-5);
+    margin-bottom: var(--space-5);
+  }
+
+  .partner-logo {
+    width: 72px;
+    height: 72px;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    flex-shrink: 0;
+    background: var(--color-dark-50);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+  }
+
+  h2 {
+    font-family: var(--font-heading);
+    font-size: var(--text-2xl);
+    font-weight: 600;
+    color: var(--color-dark-900);
+    margin: 0 0 var(--space-2);
+  }
+
+  .partner-tag {
+    display: inline-block;
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    border-radius: var(--radius-full);
+
+    &.color-primary {
+      background: var(--color-primary-50);
+      color: var(--color-primary-700);
+    }
+
+    &.color-secondary {
+      background: var(--color-secondary-50);
+      color: var(--color-secondary-700);
+    }
+
+    &.color-accent {
+      background: var(--color-accent-50);
+      color: var(--color-accent-700);
+    }
+  }
+
   .partner-intro {
     margin-bottom: var(--space-6);
 
@@ -221,6 +304,13 @@ const PartnerSection = styled.section`
       color: var(--color-dark-700);
       line-height: 1.8;
       font-weight: 500;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .partner-head {
+      flex-direction: column;
+      align-items: flex-start;
     }
   }
 `;
@@ -301,20 +391,6 @@ const SupportCard = styled.div`
     font-size: var(--text-sm);
     color: var(--color-dark-600);
     line-height: 1.6;
-    margin: 0;
-  }
-`;
-
-const ConclusionSection = styled.div`
-  padding: var(--space-6);
-  background: var(--color-primary-50);
-  border-radius: var(--radius-xl);
-  border-left: 4px solid var(--color-primary-500);
-
-  p {
-    font-size: var(--text-base);
-    color: var(--color-dark-700);
-    line-height: 1.8;
     margin: 0;
   }
 `;
