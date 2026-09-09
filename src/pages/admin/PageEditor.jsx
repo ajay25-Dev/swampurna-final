@@ -100,6 +100,12 @@ const PageEditor = () => {
     { value: "home_about_header", label: "About Header (\"Know Who We Are\")" },
     { value: "home_about_accordion", label: "About Accordion (Vision / Mission / Story)" },
     { value: "home_about_video", label: "About Video" },
+    { value: "home_features_header", label: "Why Choose Us Header" },
+    { value: "home_features", label: "Why Choose Us Features" },
+    { value: "home_updates_header", label: "News & Events Header" },
+    { value: "home_current_updates", label: "News & Events - Current Updates" },
+    { value: "home_upcoming_events", label: "News & Events - Upcoming Events" },
+    { value: "home_latest_updates", label: "News & Events - Latest Updates" },
   ];
 
   const isHeroImages = isHome && sectionKey === "hero_images";
@@ -107,8 +113,15 @@ const PageEditor = () => {
   const isAboutHeader = isHome && sectionKey === "home_about_header";
   const isAboutAccordion = isHome && sectionKey === "home_about_accordion";
   const isAboutVideo = isHome && sectionKey === "home_about_video";
-  const isHomeDedicated = isHeroImages || isPrincipalInvestigator || isAboutHeader || isAboutAccordion || isAboutVideo;
-  const isSingletonSection = isPrincipalInvestigator || isAboutHeader || isAboutVideo;
+  const isFeaturesHeader = isHome && sectionKey === "home_features_header";
+  const isFeatures = isHome && sectionKey === "home_features";
+  const isUpdatesHeader = isHome && sectionKey === "home_updates_header";
+  const isCurrentUpdates = isHome && sectionKey === "home_current_updates";
+  const isUpcomingEvents = isHome && sectionKey === "home_upcoming_events";
+  const isLatestUpdates = isHome && sectionKey === "home_latest_updates";
+  const isEventSection = isCurrentUpdates || isUpcomingEvents || isLatestUpdates;
+  const isHomeDedicated = isHeroImages || isPrincipalInvestigator || isAboutHeader || isAboutAccordion || isAboutVideo || isFeaturesHeader || isFeatures || isUpdatesHeader || isEventSection;
+  const isSingletonSection = isPrincipalInvestigator || isAboutHeader || isAboutVideo || isFeaturesHeader || isUpdatesHeader;
 
   useEffect(() => {
     adminApi
@@ -361,14 +374,14 @@ const PageEditor = () => {
       const res = await adminApi.createItem({
         page_slug: contentSlug,
         section_key: finalSectionKey,
-        title: isPhotoGallery ? "" : isVideoGallery ? "New Video" : isImpactStory ? "New Article" : isImpactStories ? "New Story" : isNewsArticles ? "New Article" : isFaqs ? "New question?" : isCompetitionEvent ? "New Event" : isMythsTaboos ? "New myth heading" : isMenstrualProducts ? "New Product" : isGovernmentInitiatives ? "New milestone title" : isOurTeam ? "New Team Member" : isOurApproach ? "New Approach Title" : isHeroImages ? "" : isPrincipalInvestigator ? "Dr. Full Name" : isAboutHeader ? "Know Who We Are" : isAboutAccordion ? "New accordion title" : isAboutVideo ? "Watch Our Story" : "New Item",
+        title: isPhotoGallery ? "" : isVideoGallery ? "New Video" : isImpactStory ? "New Article" : isImpactStories ? "New Story" : isNewsArticles ? "New Article" : isFaqs ? "New question?" : isCompetitionEvent ? "New Event" : isMythsTaboos ? "New myth heading" : isMenstrualProducts ? "New Product" : isGovernmentInitiatives ? "New milestone title" : isOurTeam ? "New Team Member" : isOurApproach ? "New Approach Title" : isHeroImages ? "" : isPrincipalInvestigator ? "Dr. Full Name" : isAboutHeader ? "Know Who We Are" : isAboutAccordion ? "New accordion title" : isAboutVideo ? "Watch Our Story" : isFeaturesHeader ? "Why Millions of Women Choose Swampurna?" : isFeatures ? "New feature title" : isUpdatesHeader ? "News & Events" : isEventSection ? "New update text" : "New Item",
         image_url: isPhotoGallery ? uploadUrl : isVideoGallery ? "" : (isImpactStory || isImpactStories || isNewsArticles || isCompetitionEvent || isMenstrualProducts || isOurTeam || isOurApproach || isHeroImages || isPrincipalInvestigator || isAboutVideo) ? "" : undefined,
-        description: isFaqs ? "New answer..." : isMenstrualProducts ? "" : isGovernmentInitiatives ? "" : isOurTeam ? "" : isOurApproach ? "" : (isPrincipalInvestigator || isAboutAccordion) ? "" : undefined,
-        tag: isFaqs ? "active" : isMythsTaboos ? "active" : isMenstrualProducts ? "primary" : isOurTeam ? "primary" : isOurApproach ? "primary" : isAboutHeader ? "About Swampurna" : isAboutAccordion ? "✨" : undefined,
-        meta: isImpactStories ? { color: "primary", isHeader: false } : isCompetitionEvent ? { location: "", buttonText: "Register Now", color: "primary" } : isGovernmentInitiatives ? { government: "", status: "", beneficiaries: "" } : isOurTeam ? { qualification: "", email: "" } : isOurApproach ? { icon: "smartphone" } : isPrincipalInvestigator ? { label: "Principal Investigator", stats: [{ label: "Publications", value: "" }, { label: "Years Exp", value: "" }] } : isAboutAccordion ? { color: "primary" } : undefined,
+        description: isFaqs ? "New answer..." : isMenstrualProducts ? "" : isGovernmentInitiatives ? "" : isOurTeam ? "" : isOurApproach ? "" : (isPrincipalInvestigator || isAboutAccordion) ? "" : isFeatures ? "" : undefined,
+        tag: isFaqs ? "active" : isMythsTaboos ? "active" : isMenstrualProducts ? "primary" : isOurTeam ? "primary" : isOurApproach ? "primary" : isAboutHeader ? "About Swampurna" : isAboutAccordion ? "✨" : isFeatures ? "primary" : isFeaturesHeader ? "Why Choose Us" : isUpdatesHeader ? "Stay Updated" : isEventSection ? "Category" : undefined,
+        meta: isImpactStories ? { color: "primary", isHeader: false } : isCompetitionEvent ? { location: "", buttonText: "Register Now", color: "primary" } : isGovernmentInitiatives ? { government: "", status: "", beneficiaries: "" } : isOurTeam ? { qualification: "", email: "" } : isOurApproach ? { icon: "smartphone" } : isPrincipalInvestigator ? { label: "Principal Investigator", stats: [{ label: "Publications", value: "" }, { label: "Years Exp", value: "" }] } : isAboutAccordion ? { color: "primary" } : isFeatures ? { icon: "shield" } : undefined,
         category_id: isNewsArticles ? (newsCategories[0]?.id || null) : undefined,
         category: isNewsArticles ? (newsCategories[0]?.name || "News") : undefined,
-        subtitle: isCompetitionEvent ? "Event Date" : isGovernmentInitiatives ? "2026" : isOurTeam ? "Team Member" : isPrincipalInvestigator ? "Ph.D." : isAboutHeader ? "Discover our journey, mission, and the impact we're making in menstrual health education" : isAboutVideo ? "Learn about our mission" : undefined,
+        subtitle: isCompetitionEvent ? "Event Date" : isGovernmentInitiatives ? "2026" : isOurTeam ? "Team Member" : isPrincipalInvestigator ? "Ph.D." : isAboutHeader ? "Discover our journey, mission, and the impact we're making in menstrual health education" : isAboutVideo ? "Learn about our mission" : isFeaturesHeader ? "Trusted by women across India for reliable, secure, and personalized menstrual health tracking" : isUpdatesHeader ? "Keep track of our latest activities, upcoming events, and important announcements" : isEventSection ? "Date" : undefined,
         link_url: isCompetitionEvent ? "" : isAboutVideo ? "" : undefined,
         sort_order: items.length,
       });
@@ -510,8 +523,20 @@ const PageEditor = () => {
                                           ? "Add the Vision / Mission / Story accordion cards."
                                           : isAboutVideo
                                             ? "Edit the homepage story video and its link."
-                                            : isHome
-                                              ? "Pick a section below to manage its content."
+                                            : isFeaturesHeader
+                                              ? "Edit the \"Why Choose Us\" section heading."
+                                              : isFeatures
+                                                ? "Add each 'Why Choose Us' feature card with icon, title and description."
+                                                : isUpdatesHeader
+                                                  ? "Edit the \"News & Events\" section heading."
+                                                  : isCurrentUpdates
+                                                    ? "Add items shown in the Current Updates column."
+                                                    : isUpcomingEvents
+                                                      ? "Add items shown in the Upcoming Events column."
+                                                      : isLatestUpdates
+                                                        ? "Add items shown in the Latest Updates column."
+                                                        : isHome
+                                                          ? "Pick a section below to manage its content."
                   : "Manage page hero and content blocks."}
             </p>
           </div>
@@ -650,6 +675,18 @@ const PageEditor = () => {
                                             ? "Vision / Mission / Story Cards"
                                             : isAboutVideo
                                               ? "Story Video"
+                                              : isFeaturesHeader
+                                                ? "Why Choose Us Header"
+                                                : isFeatures
+                                                  ? "Why Choose Us Features"
+                                                  : isUpdatesHeader
+                                                    ? "News & Events Header"
+                                                    : isCurrentUpdates
+                                                      ? "Current Updates"
+                                                      : isUpcomingEvents
+                                                        ? "Upcoming Events"
+                                                        : isLatestUpdates
+                                                          ? "Latest Updates"
                     : "Section Items"}
             </div>
             <div className="row">
@@ -733,6 +770,18 @@ const PageEditor = () => {
                       ? "Add Card"
                     : isAboutVideo
                       ? (items.length > 0 ? "Video Created" : "Create Video")
+                    : isFeaturesHeader
+                      ? (items.length > 0 ? "Header Created" : "Create Header")
+                    : isFeatures
+                      ? "Add Feature"
+                    : isUpdatesHeader
+                      ? (items.length > 0 ? "Header Created" : "Create Header")
+                    : isCurrentUpdates
+                      ? "Add Current Update"
+                    : isUpcomingEvents
+                      ? "Add Upcoming Event"
+                    : isLatestUpdates
+                      ? "Add Latest Update"
                     : "Add Item"}
             </button>
           </div>
@@ -745,7 +794,7 @@ const PageEditor = () => {
                   <div className="id">{item.id}</div>
                 </div>
                 <div
-                  className={`item-grid ${isPhotoGallery ? "gallery-item-grid" : ""} ${isVideoGallery ? "video-item-grid" : ""} ${isImpactStory || isImpactStories ? "impact-item-grid" : ""} ${isNewsArticles ? "news-item-grid" : ""} ${isFaqs ? "faq-item-grid" : ""} ${isCompetitionEvent ? "competition-item-grid" : ""} ${isMythsTaboos ? "myths-item-grid" : ""} ${isMenstrualProducts ? "product-item-grid" : ""} ${isGovernmentInitiatives ? "gov-item-grid" : ""} ${isOurTeam ? "team-item-grid" : ""} ${isOurApproach ? "approach-item-grid" : ""} ${isHeroImages ? "hero-item-grid" : ""} ${isPrincipalInvestigator ? "pi-item-grid" : ""} ${isAboutHeader ? "about-header-item-grid" : ""} ${isAboutAccordion ? "accordion-item-grid" : ""} ${isAboutVideo ? "about-video-item-grid" : ""}`}
+                  className={`item-grid ${isPhotoGallery ? "gallery-item-grid" : ""} ${isVideoGallery ? "video-item-grid" : ""} ${isImpactStory || isImpactStories ? "impact-item-grid" : ""} ${isNewsArticles ? "news-item-grid" : ""} ${isFaqs ? "faq-item-grid" : ""} ${isCompetitionEvent ? "competition-item-grid" : ""} ${isMythsTaboos ? "myths-item-grid" : ""} ${isMenstrualProducts ? "product-item-grid" : ""} ${isGovernmentInitiatives ? "gov-item-grid" : ""} ${isOurTeam ? "team-item-grid" : ""} ${isOurApproach ? "approach-item-grid" : ""} ${isHeroImages ? "hero-item-grid" : ""} ${isPrincipalInvestigator ? "pi-item-grid" : ""} ${isAboutHeader ? "about-header-item-grid" : ""} ${isAboutAccordion ? "accordion-item-grid" : ""} ${isAboutVideo ? "about-video-item-grid" : ""} ${isFeaturesHeader ? "about-header-item-grid" : ""} ${isFeatures ? "feature-item-grid" : ""} ${isUpdatesHeader ? "about-header-item-grid" : ""} ${isEventSection ? "event-item-grid" : ""}`}
                 >
                   {isPhotoGallery && (
                     <div className="gallery-preview">
@@ -1635,6 +1684,113 @@ const PageEditor = () => {
                       placeholder="Full documentary / watch link (e.g. https://www.youtube.com/watch?v=VIDEO_ID)"
                     />
                   )}
+                  {(isFeaturesHeader || isUpdatesHeader) && (
+                    <input
+                      className="about-header-tag"
+                      value={item.tag || ""}
+                      onChange={(e) => updateItemField(item.id, "tag", e.target.value)}
+                      placeholder={isFeaturesHeader ? "Eyebrow tag (e.g. Why Choose Us)" : "Eyebrow tag (e.g. Stay Updated)"}
+                    />
+                  )}
+                  {(isFeaturesHeader || isUpdatesHeader) && (
+                    <input
+                      className="about-header-title"
+                      value={item.title || ""}
+                      onChange={(e) => updateItemField(item.id, "title", e.target.value)}
+                      placeholder={isFeaturesHeader ? "Heading (e.g. Why Millions of Women Choose Swampurna?)" : "Heading (e.g. News & Events)"}
+                    />
+                  )}
+                  {(isFeaturesHeader || isUpdatesHeader) && (
+                    <textarea
+                      className="about-header-subtitle"
+                      rows="3"
+                      value={item.subtitle || ""}
+                      onChange={(e) => updateItemField(item.id, "subtitle", e.target.value)}
+                      placeholder="Subtitle text shown under the heading"
+                    />
+                  )}
+                  {isFeatures && (
+                    <input
+                      className="feature-title"
+                      value={item.title || ""}
+                      onChange={(e) => updateItemField(item.id, "title", e.target.value)}
+                      placeholder="Feature title (e.g. Reliable Predictions)"
+                    />
+                  )}
+                  {isFeatures && (
+                    <select
+                      className="feature-icon"
+                      value={item.meta?.icon || "shield"}
+                      onChange={(e) => updateItemMetaField(item.id, "icon", e.target.value)}
+                    >
+                      <option value="shield">Shield</option>
+                      <option value="heart">Heart</option>
+                      <option value="lock">Lock</option>
+                    </select>
+                  )}
+                  {isFeatures && (
+                    <select
+                      className="feature-color"
+                      value={item.tag || "primary"}
+                      onChange={(e) => updateItemField(item.id, "tag", e.target.value)}
+                    >
+                      <option value="primary">Primary</option>
+                      <option value="secondary">Secondary</option>
+                      <option value="accent">Accent</option>
+                    </select>
+                  )}
+                  {isFeatures && (
+                    <textarea
+                      className="feature-description"
+                      rows="4"
+                      value={item.description || ""}
+                      onChange={(e) => updateItemField(item.id, "description", e.target.value)}
+                      placeholder="Description"
+                    />
+                  )}
+                  {isFeatures && (
+                    <input
+                      className="feature-sort"
+                      type="number"
+                      value={item.sort_order ?? 0}
+                      onChange={(e) => updateItemField(item.id, "sort_order", Number(e.target.value))}
+                      placeholder="Sort Order"
+                    />
+                  )}
+                  {isEventSection && (
+                    <input
+                      className="event-category"
+                      value={item.tag || ""}
+                      onChange={(e) => updateItemField(item.id, "tag", e.target.value)}
+                      placeholder="Category badge (e.g. Workshop, Announcement)"
+                    />
+                  )}
+                  {isEventSection && (
+                    <input
+                      className="event-date"
+                      value={item.subtitle || ""}
+                      onChange={(e) => updateItemField(item.id, "subtitle", e.target.value)}
+                      placeholder="Date text (e.g. 12 Mar 2026)"
+                    />
+                  )}
+                  {isEventSection && (
+                    <textarea
+                      className="event-text"
+                      rows="3"
+                      value={item.title || ""}
+                      onChange={(e) => updateItemField(item.id, "title", e.target.value)}
+                      placeholder="Update text shown on the card"
+                    />
+                  )}
+                  {isEventSection && (
+                    <input
+                      className="event-sort"
+                      type="number"
+                      value={item.sort_order ?? 0}
+                      onChange={(e) => updateItemField(item.id, "sort_order", Number(e.target.value))}
+                      placeholder="Sort Order"
+                    />
+                  )}
                   {!isPhotoGallery && !isVideoGallery && !isImpactStory && !isImpactStories && !isNewsArticles && !isFaqs && !isCompetitionEvent && !isMythsTaboos && !isMenstrualProducts && !isGovernmentInitiatives && !isOurTeam && !isOurApproach && !isHomeDedicated && (
                     <input
                       value={item.title || ""}
@@ -2108,6 +2264,52 @@ const Wrap = styled.div`
     grid-template-columns: 1fr;
   }
 
+  .feature-item-grid {
+    grid-template-columns: minmax(0, 1fr) 130px 130px 100px;
+    align-items: start;
+  }
+
+  .feature-title {
+    grid-column: 1;
+  }
+
+  .feature-icon {
+    grid-column: 2;
+  }
+
+  .feature-color {
+    grid-column: 3;
+  }
+
+  .feature-sort {
+    grid-column: 4;
+  }
+
+  .feature-description {
+    grid-column: 1 / -1;
+  }
+
+  .event-item-grid {
+    grid-template-columns: 150px 150px 100px;
+    align-items: start;
+  }
+
+  .event-category {
+    grid-column: 1;
+  }
+
+  .event-date {
+    grid-column: 2;
+  }
+
+  .event-sort {
+    grid-column: 3;
+  }
+
+  .event-text {
+    grid-column: 1 / -1;
+  }
+
   .impact-title {
     grid-column: 1;
   }
@@ -2396,7 +2598,9 @@ const Wrap = styled.div`
 
     .hero-item-grid,
     .pi-item-grid,
-    .accordion-item-grid {
+    .accordion-item-grid,
+    .feature-item-grid,
+    .event-item-grid {
       grid-template-columns: 1fr;
     }
 
