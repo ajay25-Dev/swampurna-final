@@ -103,6 +103,12 @@ const AdminLayout = ({ children }) => {
             <NavLink to="/admin/impactstory-submissions" className="nav-link" onClick={() => setSidebarOpen(false)}>
               Story Submissions
             </NavLink>
+            <NavLink to="/admin/contact-submissions" className="nav-link" onClick={() => setSidebarOpen(false)}>
+              Contact Submissions
+            </NavLink>
+            <NavLink to="/admin/event-registrations" className="nav-link" onClick={() => setSidebarOpen(false)}>
+              Event Registrations
+            </NavLink>
             <NavLink to="/admin/jan-aushadhi-kendras" className="nav-link" onClick={() => setSidebarOpen(false)}>
               Jan Aushadhi Kendras
             </NavLink>

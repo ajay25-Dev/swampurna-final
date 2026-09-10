@@ -39,6 +39,7 @@ const SMTP_PORT = Number(process.env.SMTP_PORT) || 587;
 const SMTP_USER = process.env.SMTP_USER || "";
 const SMTP_PASS = process.env.SMTP_PASS || "";
 const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER || "";
+const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || "bitn.dstprj@bitmesra.ac.in";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.APIKEY || "";
 const OPENAI_CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || "gpt-4.1-mini";
 const COOKIE_SAME_SITE = process.env.COOKIE_SAME_SITE || (process.env.NODE_ENV === "production" ? "none" : "lax");
@@ -152,6 +153,38 @@ function impactStorySubmissionsSetupError() {
   return {
     error:
       "Share Your Story submissions table/columns are not set up yet. Run server/sql/impact_story_submissions_schema.sql in Supabase SQL Editor, then reload the schema cache.",
+  };
+}
+
+function isMissingContactSubmissionsTable(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    error?.code === "PGRST205" ||
+    error?.code === "42P01" ||
+    (message.includes("contact_submissions") && message.includes("schema cache"))
+  );
+}
+
+function contactSubmissionsSetupError() {
+  return {
+    error:
+      "Contact Us submissions table is not set up yet. Run server/sql/contact_submissions_schema.sql in Supabase SQL Editor, then reload the schema cache.",
+  };
+}
+
+function isMissingEventRegistrationsTable(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    error?.code === "PGRST205" ||
+    error?.code === "42P01" ||
+    (message.includes("event_registrations") && message.includes("schema cache"))
+  );
+}
+
+function eventRegistrationsSetupError() {
+  return {
+    error:
+      "Event Detail Form submissions table is not set up yet. Run server/sql/event_registrations_schema.sql in Supabase SQL Editor, then reload the schema cache.",
   };
 }
 
@@ -392,6 +425,10 @@ async function sendOtpEmail({ to, otp }) {
       </body>
     </html>
   `;
+  await sendEmail({ to, subject, text, html });
+}
+
+async function sendEmail({ to, subject, text, html }) {
   if (RESEND_API_KEY) {
     const response = await fetch(`${RESEND_API_BASE.replace(/\/+$/, "")}/emails`, {
       method: "POST",
@@ -430,6 +467,70 @@ async function sendOtpEmail({ to, otp }) {
   });
 
   await transporter.sendMail({ from: SMTP_FROM, to, subject, text, html });
+}
+
+function escapeHtmlForEmail(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function adminNotifyRowHtml(label, value) {
+  if (!value) return "";
+  return `
+    <tr>
+      <td style="padding:6px 0;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">${escapeHtmlForEmail(label)}</td>
+    </tr>
+    <tr>
+      <td style="padding:0 0 14px;font-size:15px;color:#0f172a;">${escapeHtmlForEmail(value)}</td>
+    </tr>
+  `;
+}
+
+async function notifyAdminOfSubmission({ heading, intro, rows, textLines }) {
+  const subject = heading;
+  const text = [intro, "", ...textLines].join("\n");
+  const html = `
+    <!doctype html>
+    <html lang="en">
+      <body style="margin:0;padding:0;background:#f1f6fb;font-family:Arial,sans-serif;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="padding:28px 12px;">
+          <tr>
+            <td align="center">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:620px;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #d9e5f2;">
+                <tr>
+                  <td style="background:linear-gradient(90deg,#0f4b8a,#0d77be);padding:20px 26px;color:#ffffff;">
+                    <div style="font-size:21px;font-weight:700;letter-spacing:.3px;">Swampurna</div>
+                    <div style="font-size:13px;opacity:.9;margin-top:4px;">${escapeHtmlForEmail(heading)}</div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:24px 26px 6px;">
+                    <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#334155;">${escapeHtmlForEmail(intro)}</p>
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                      ${rows.map((r) => adminNotifyRowHtml(r.label, r.value)).join("")}
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 26px 24px;border-top:1px solid #edf2f7;">
+                    <div style="font-size:12px;color:#94a3b8;">This is an automated notification from the Swampurna website. Also visible anytime in the admin panel.</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
+  `;
+
+  try {
+    await sendEmail({ to: ADMIN_NOTIFY_EMAIL, subject, text, html });
+  } catch (err) {
+    console.error(`Failed to send admin notification email (${heading}):`, err?.message || err);
+  }
 }
 
 async function createAndSendOtpForUser({ user, purpose = "login" }) {
@@ -1655,6 +1756,235 @@ app.post("/api/admin/impactstories/submissions/:id/unpublish", authRequired, asy
     message: matchingIds.length > 0 ? "Story removed from the live site." : "Marked as unpublished (no live copy was found).",
     data: updated,
   });
+});
+
+app.post("/api/v1/contact/submit", async (req, res) => {
+  const first_name = String(req.body?.firstName || req.body?.first_name || "").trim();
+  const last_name = String(req.body?.lastName || req.body?.last_name || "").trim();
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const phone = String(req.body?.phone || "").trim();
+  const subject = String(req.body?.subject || "").trim();
+  const message = String(req.body?.message || "").trim();
+
+  if (!first_name) return res.status(400).json({ error: "first_name is required" });
+  if (!email) return res.status(400).json({ error: "email is required" });
+  if (!message) return res.status(400).json({ error: "message is required" });
+
+  const { data, error } = await supabase
+    .from("contact_submissions")
+    .insert({
+      first_name,
+      last_name: last_name || null,
+      email,
+      phone: phone || null,
+      subject: subject || null,
+      message,
+      status: "new",
+    })
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    if (isMissingContactSubmissionsTable(error)) {
+      return res.status(503).json(contactSubmissionsSetupError());
+    }
+    return res.status(400).json({ error: error?.message || "Failed to submit message" });
+  }
+
+  notifyAdminOfSubmission({
+    heading: "New Contact Us Enquiry",
+    intro: `${first_name} ${last_name || ""} sent a message via the Contact Us form.`.trim(),
+    rows: [
+      { label: "Name", value: `${first_name} ${last_name || ""}`.trim() },
+      { label: "Email", value: email },
+      { label: "Phone", value: phone },
+      { label: "Subject", value: subject },
+      { label: "Message", value: message },
+    ],
+    textLines: [
+      `Name: ${first_name} ${last_name || ""}`.trim(),
+      `Email: ${email}`,
+      phone ? `Phone: ${phone}` : "",
+      subject ? `Subject: ${subject}` : "",
+      `Message: ${message}`,
+    ].filter(Boolean),
+  });
+
+  return res.json({ message: "Message submitted successfully.", data });
+});
+
+app.get("/api/admin/contact-submissions", authRequired, async (req, res) => {
+  const status = req.query.status ? String(req.query.status).trim().toLowerCase() : "";
+  let query = supabase
+    .from("contact_submissions")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (status) query = query.eq("status", status);
+  const { data, error } = await query;
+  if (error) {
+    if (isMissingContactSubmissionsTable(error)) {
+      return res.status(503).json(contactSubmissionsSetupError());
+    }
+    return res.status(400).json({ error: error.message });
+  }
+  return res.json({ data: data || [] });
+});
+
+app.put("/api/admin/contact-submissions/:id/status", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const status = String(req.body?.status || "").trim().toLowerCase();
+  if (!["new", "read", "responded", "archived"].includes(status)) {
+    return res.status(400).json({ error: "Invalid status" });
+  }
+  const { data, error } = await supabase
+    .from("contact_submissions")
+    .update({ status })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error || !data) {
+    if (isMissingContactSubmissionsTable(error)) {
+      return res.status(503).json(contactSubmissionsSetupError());
+    }
+    return res.status(400).json({ error: error?.message || "Failed to update status" });
+  }
+  return res.json({ data });
+});
+
+app.delete("/api/admin/contact-submissions/:id", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const { data, error } = await supabase
+    .from("contact_submissions")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    if (isMissingContactSubmissionsTable(error)) {
+      return res.status(503).json(contactSubmissionsSetupError());
+    }
+    if (error?.code === "PGRST116") {
+      return res.status(404).json({ error: "Submission not found" });
+    }
+    return res.status(400).json({ error: error?.message || "Failed to delete submission" });
+  }
+
+  return res.json({ message: "Submission deleted", data });
+});
+
+app.post("/api/v1/event-registrations/submit", async (req, res) => {
+  const event_title = String(req.body?.event_title || "").trim();
+  const event_slug = String(req.body?.event_slug || "").trim();
+  const name = String(req.body?.name || "").trim();
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const phone = String(req.body?.phone || "").trim();
+  const details = String(req.body?.details || "").trim();
+
+  if (!event_title) return res.status(400).json({ error: "event_title is required" });
+  if (!name) return res.status(400).json({ error: "name is required" });
+
+  const { data, error } = await supabase
+    .from("event_registrations")
+    .insert({
+      event_title,
+      event_slug: event_slug || null,
+      name,
+      email: email || null,
+      phone: phone || null,
+      details: details || null,
+      status: "new",
+    })
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    if (isMissingEventRegistrationsTable(error)) {
+      return res.status(503).json(eventRegistrationsSetupError());
+    }
+    return res.status(400).json({ error: error?.message || "Failed to submit form" });
+  }
+
+  notifyAdminOfSubmission({
+    heading: "New Event Detail Form Submission",
+    intro: `${name} submitted the Event Detail Form for "${event_title}".`,
+    rows: [
+      { label: "Event", value: event_title },
+      { label: "Name", value: name },
+      { label: "Email", value: email },
+      { label: "Phone", value: phone },
+      { label: "Details", value: details },
+    ],
+    textLines: [
+      `Event: ${event_title}`,
+      `Name: ${name}`,
+      email ? `Email: ${email}` : "",
+      phone ? `Phone: ${phone}` : "",
+      details ? `Details: ${details}` : "",
+    ].filter(Boolean),
+  });
+
+  return res.json({ message: "Submitted successfully.", data });
+});
+
+app.get("/api/admin/event-registrations", authRequired, async (req, res) => {
+  const status = req.query.status ? String(req.query.status).trim().toLowerCase() : "";
+  let query = supabase
+    .from("event_registrations")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (status) query = query.eq("status", status);
+  const { data, error } = await query;
+  if (error) {
+    if (isMissingEventRegistrationsTable(error)) {
+      return res.status(503).json(eventRegistrationsSetupError());
+    }
+    return res.status(400).json({ error: error.message });
+  }
+  return res.json({ data: data || [] });
+});
+
+app.put("/api/admin/event-registrations/:id/status", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const status = String(req.body?.status || "").trim().toLowerCase();
+  if (!["new", "contacted", "confirmed", "archived"].includes(status)) {
+    return res.status(400).json({ error: "Invalid status" });
+  }
+  const { data, error } = await supabase
+    .from("event_registrations")
+    .update({ status })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error || !data) {
+    if (isMissingEventRegistrationsTable(error)) {
+      return res.status(503).json(eventRegistrationsSetupError());
+    }
+    return res.status(400).json({ error: error?.message || "Failed to update status" });
+  }
+  return res.json({ data });
+});
+
+app.delete("/api/admin/event-registrations/:id", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const { data, error } = await supabase
+    .from("event_registrations")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    if (isMissingEventRegistrationsTable(error)) {
+      return res.status(503).json(eventRegistrationsSetupError());
+    }
+    if (error?.code === "PGRST116") {
+      return res.status(404).json({ error: "Registration not found" });
+    }
+    return res.status(400).json({ error: error?.message || "Failed to delete registration" });
+  }
+
+  return res.json({ message: "Registration deleted", data });
 });
 
 app.get("/api/v1/testimonials", async (req, res) => {

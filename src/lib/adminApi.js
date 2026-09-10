@@ -134,6 +134,24 @@ export const adminApi = {
       method: "POST",
       body: JSON.stringify({ status }),
     }),
+  getContactSubmissions: ({ status = "" } = {}) =>
+    request(`/api/admin/contact-submissions?status=${encodeURIComponent(status)}`),
+  updateContactSubmissionStatus: (id, status) =>
+    request(`/api/admin/contact-submissions/${id}/status`, {
+      method: "PUT",
+      body: JSON.stringify({ status }),
+    }),
+  deleteContactSubmission: (id) =>
+    request(`/api/admin/contact-submissions/${id}`, { method: "DELETE" }),
+  getEventRegistrations: ({ status = "" } = {}) =>
+    request(`/api/admin/event-registrations?status=${encodeURIComponent(status)}`),
+  updateEventRegistrationStatus: (id, status) =>
+    request(`/api/admin/event-registrations/${id}/status`, {
+      method: "PUT",
+      body: JSON.stringify({ status }),
+    }),
+  deleteEventRegistration: (id) =>
+    request(`/api/admin/event-registrations/${id}`, { method: "DELETE" }),
   deleteImpactStorySubmission: (id) =>
     request(`/api/admin/impactstories/submissions/${id}`, {
       method: "DELETE",

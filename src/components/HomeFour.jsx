@@ -351,6 +351,27 @@ const UpdatesSection = styled.section`
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
+    max-height: 480px;
+    overflow-y: auto;
+    padding-right: var(--space-2);
+    margin-right: calc(var(--space-2) * -1);
+
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--color-dark-200);
+      border-radius: var(--radius-full);
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: var(--color-dark-300);
+    }
   }
 
   .coming-soon-message {

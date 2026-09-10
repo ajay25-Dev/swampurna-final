@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Cycle Defense Pro</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+<style>
+  :root {
+    --bg-main: #0B0E14;
+    --bg-sec: #151A28;
+    --panel-bg: rgba(30, 36, 51, 0.85);
+    --panel-border: rgba(255, 255, 255, 0.1);
+    --text-main: #F3F4F6;
+    --text-muted: #9CA3AF;
+    
+    /* Elements */
+    --core-color: #C62828;
+    --core-glow: rgba(198, 40, 40, 0.4);
+    --energy-color: #FBBF24;
+    
+    /* Defenders */
+    --hydration: #38BDF8;
+    --iron: #4ADE80;
+    --heat: #FB923C;
+    --rest: #A78BFA;
+    --yoga: #2DD4BF;
+    
+    /* Enemies */
+    --enemy-bg: #27272A;
+    --enemy-border: rgba(255, 255, 255, 0.2);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Outfit', sans-serif; }
+  
+  html, body {
+    height: 100%;
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #root {
+    position: relative;
+    width: 100%;
+    height: 100%; /* Mobile viewport fix */
+    min-height: 480px; /* Reduced from 600px to fit smaller screens perfectly */
+    display: flex;
+    flex-direction: column;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); /* iOS home indicator support */
+    background: radial-gradient(circle at 50% 0%, var(--bg-sec), var(--bg-main) 80%);
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    max-width: 600px;
+    width: 100%;
+    margin: 0 auto 12px;
+    background: var(--panel-bg);
+    padding: 10px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--panel-border);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    z-index: 10;
+  }
+
+  .hud-stats { display: flex; flex: 1; align-items: center; gap: 16px; }
+  
+  .stat-group { display: flex; flex-direction: column; flex: 1; }
+  .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; margin-bottom: 4px; display: flex; justify-content: space-between;}
+  
+  .bar-bg { height: 12px; background: rgba(0,0,0,0.5); border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05); }
+  .bar-fill { height: 100%; background: linear-gradient(90deg, #8B0000, var(--core-color)); transition: width 0.3s ease; box-shadow: 0 0 10px var(--core-glow); }
+  
+  .energy-badge {
+    background: rgba(251, 191, 36, 0.15);
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    padding: 6px 14px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--energy-color);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 0 15px rgba(251, 191, 36, 0.1);
+  }
+
+  .menu-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: white;
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .menu-btn:hover { background: rgba(255,255,255,0.2); transform: scale(1.05); }
+  .menu-btn svg { width: 20px; height: 20px; fill: currentColor; }
+
+  .battlefield-container {
+    max-width: 600px;
+    width: 100%;
+    margin: 0 auto;
+    flex: 1;
+    min-height: 0; /* CRITICAL: Allows flex container to shrink properly */
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  .battlefield {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--panel-border);
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 0 30px rgba(0,0,0,0.5);
+  }
+
+  .lane {
+    flex: 1;
+    position: relative;
+    border-bottom: 1px dashed rgba(255,255,255,0.05);
+  }
+  .lane:last-child { border-bottom: none; }
+
+  .core-zone {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 10%;
+    background: linear-gradient(90deg, rgba(198, 40, 40, 0.2), transparent);
+    border-right: 1px solid rgba(198, 40, 40, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    z-index: 2;
+    animation: pulseCore 2s infinite alternate;
+  }
+  @keyframes pulseCore {
+    0% { background: linear-gradient(90deg, rgba(198, 40, 40, 0.1), transparent); }
+    100% { background: linear-gradient(90deg, rgba(198, 40, 40, 0.35), transparent); }
+  }
+
+  .slot {
+    position: absolute; top: 50%; width: 44px; height: 44px;
+    transform: translate(-50%, -50%);
+    border-radius: 12px;
+    border: 2px dashed rgba(255,255,255,0.1);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 3;
+  }
+  .slot.placeable { border-color: var(--energy-color); background: rgba(251, 191, 36, 0.08); box-shadow: inset 0 0 10px rgba(251, 191, 36, 0.1); }
+  .slot:hover.placeable { transform: translate(-50%, -50%) scale(1.1); }
+  .slot.occupied { border-style: solid; border-color: transparent; }
+
+  .unit {
+    position: absolute; top: 50%; transform: translate(-50%, -50%);
+    display: flex; flex-direction: column; align-items: center;
+    z-index: 4; pointer-events: none;
+  }
+  
+  .unit .icon-wrap {
+    width: 40px; height: 40px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    transition: transform 0.1s;
+    animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  }
+  @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  
+  .unit.hit .icon-wrap { animation: hitflash 0.15s ease; }
+  @keyframes hitflash { 0% { transform: scale(1); filter: brightness(1); } 50% { transform: scale(1.2); filter: brightness(2); } 100% { transform: scale(1); filter: brightness(1); } }
+
+  .hp-bar-container {
+    width: 36px; height: 5px; border-radius: 3px;
+    background: rgba(0,0,0,0.6); overflow: hidden; margin-bottom: 4px;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .hp-fill { height: 100%; background: var(--core-color); transition: width 0.2s linear; }
+
+  /* New CSS for levels */
+  .lvl-badge {
+    position: absolute; top: -8px; right: -12px;
+    background: var(--energy-color); color: #000;
+    font-size: 8px; font-weight: 800; padding: 2px 4px;
+    border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    border: 1px solid #fff; z-index: 5;
+    letter-spacing: -1px;
+  }
+
+  /* Defender Colors */
+  .def-hydration .icon-wrap { background: linear-gradient(135deg, #0284C7, var(--hydration)); }
+  .def-iron .icon-wrap { background: linear-gradient(135deg, #16A34A, var(--iron)); }
+  .def-heat .icon-wrap { background: linear-gradient(135deg, #EA580C, var(--heat)); }
+  .def-rest .icon-wrap { background: linear-gradient(135deg, #7C3AED, var(--rest)); }
+  .def-yoga .icon-wrap { background: linear-gradient(135deg, #0D9488, var(--yoga)); }
+
+  /* Enemy Styling */
+  .enemy .icon-wrap { 
+    background: var(--enemy-bg); 
+    border: 2px solid var(--enemy-border); 
+    border-radius: 50%;
+    animation: float 2s ease-in-out infinite;
+  }
+  @keyframes float { 0% { transform: translateY(-2px); } 50% { transform: translateY(2px); } 100% { transform: translateY(-2px); } }
+  .enemy.slowed .icon-wrap { filter: saturate(0.2) brightness(0.7); box-shadow: 0 0 10px var(--rest); }
+  
+  .unit.defender { pointer-events: auto; cursor: pointer; }
+  .unit.defender:hover .icon-wrap { transform: scale(1.05); }
+
+  .tray {
+    max-width: 600px; width: 100%; margin: 12px auto 0;
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+    flex-shrink: 0;
+  }
+  .tray-btn {
+    background: var(--panel-bg);
+    border: 2px solid var(--panel-border);
+    border-radius: 16px; padding: 10px 4px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    cursor: pointer; color: var(--text-main);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+  .tray-btn:hover:not(:disabled) { background: rgba(255,255,255,0.05); transform: translateY(-3px); }
+  .tray-btn.selected { 
+    border-color: var(--energy-color); 
+    background: rgba(251, 191, 36, 0.1); 
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(251, 191, 36, 0.2);
+  }
+  .tray-btn:disabled { opacity: 0.3; cursor: not-allowed; filter: grayscale(1); }
+  
+  .tray-btn .ic { font-size: 24px; margin-bottom: 2px; }
+  .tray-btn .nm { font-size: 11px; font-weight: 600; letter-spacing: 0.5px; }
+  .tray-btn .ct { font-size: 12px; font-weight: 800; color: var(--energy-color); background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 8px;}
+
+  /* Floating Toast Notifications */
+  .toast {
+    position: absolute; top: 20px; left: 50%; transform: translate(-50%, -20px);
+    background: var(--panel-bg); color: var(--text-main);
+    padding: 8px 16px; border-radius: 20px;
+    font-size: 13px; font-weight: 600; border: 1px solid var(--panel-border);
+    opacity: 0; pointer-events: none; transition: all 0.3s ease; z-index: 100;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* Modals / Banners */
+  .modal-overlay {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(11, 14, 20, 0.85); backdrop-filter: blur(8px);
+    opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+    z-index: 50; padding: 20px; text-align: center;
+  }
+  .modal-overlay.show { opacity: 1; pointer-events: auto; }
+  
+  .modal-content {
+    background: var(--bg-sec);
+    border: 1px solid var(--panel-border);
+    padding: 30px 24px;
+    border-radius: 24px;
+    max-width: 360px; width: 100%;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    transform: scale(0.95); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  .modal-overlay.show .modal-content { transform: scale(1); }
+
+  .modal-title { font-size: 26px; font-weight: 800; margin-bottom: 12px; color: #fff; }
+  .modal-sub { font-size: 14px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.6; }
+  
+  .btn-primary {
+    background: var(--energy-color); color: #000;
+    border: none; font-weight: 800; font-size: 16px;
+    padding: 14px 32px; border-radius: 16px; cursor: pointer;
+    transition: all 0.2s ease; width: 100%;
+    box-shadow: 0 4px 15px rgba(251, 191, 36, 0.3);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(251, 191, 36, 0.4); }
+  .btn-primary:active { transform: translateY(0); }
+
+  /* Settings Menu Tabs */
+  .menu-tabs { display: flex; gap: 8px; margin-bottom: 20px; background: rgba(0,0,0,0.3); padding: 4px; border-radius: 12px;}
+  .menu-tab { 
+    flex: 1; padding: 8px; background: transparent; color: var(--text-muted); 
+    border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+  }
+  .menu-tab.active { background: rgba(255,255,255,0.1); color: #fff; }
+  
+  .menu-section { display: none; text-align: left; font-size: 14px; color: var(--text-muted); line-height: 1.6;}
+  .menu-section.active { display: block; animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+
+  .info-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px;}
+  .info-item { display: flex; align-items: center; gap: 12px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 12px;}
+  .info-icon { font-size: 20px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.05); border-radius: 8px; }
+  .info-text strong { color: #fff; display: block; font-size: 13px;}
+  .info-text span { font-size: 12px; }
+
+  .toggle-wrap { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 12px; margin-bottom: 12px;}
+  .toggle-wrap strong { color: #fff; }
+  
+  /* Menu Scroll for Instructions */
+  .menu-scroll { max-height: 60vh; overflow-y: auto; padding-right: 8px; }
+  .menu-scroll::-webkit-scrollbar { width: 4px; }
+  .menu-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 4px; }
+  .menu-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+
+  /* Toggle Switch */
+  .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: .3s; border-radius: 24px; }
+  .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: var(--text-muted); transition: .3s; border-radius: 50%; }
+  input:checked + .slider { background-color: var(--energy-color); }
+  input:checked + .slider:before { transform: translateX(20px); background-color: #000; }
+
+  /* Projectile Animation */
+  .projectile {
+    position: absolute; width: 10px; height: 10px; border-radius: 50%;
+    background: #fff; z-index: 5; pointer-events: none;
+    transition: left 0.15s linear;
+  }
+
+  @media (max-width: 400px){
+    .slot { width: 36px; height: 36px; }
+    .unit .icon-wrap { width: 32px; height: 32px; font-size: 16px; }
+    .tray { gap: 4px; margin-top: 8px; }
+    .tray-btn { padding: 6px 2px; }
+    .tray-btn .ic { font-size: 18px; margin-bottom: 0px; }
+    .tray-btn .nm { font-size: 8.5px; letter-spacing: 0; }
+    .tray-btn .ct { font-size: 10px; padding: 2px 4px; }
+    header { padding: 8px 12px; margin-bottom: 8px;}
+  }
+  
+  /* Additional fix for very short screens (landscape mobile) */
+  @media (max-height: 600px) {
+    header { margin-bottom: 6px; padding: 6px 12px; }
+    .tray { margin-top: 6px; }
+    .tray-btn { padding: 4px 2px; }
+  }
+</style>
+</head>
+<body>
+<div id="root">
+  <header>
+    <div class="hud-stats">
+      <div class="stat-group">
+        <div class="stat-label"><span>Wellness</span><span id="wellnessNum">100%</span></div>
+        <div class="bar-bg"><div class="bar-fill" id="wellnessFill"></div></div>
+      </div>
+      <div class="stat-group" style="flex: 0.5;">
+        <div class="stat-label"><span>Wave</span></div>
+        <div style="font-weight: 700; font-size: 16px;"><span id="waveNum">1</span><span style="color:var(--text-muted); font-size:12px;"> / 12</span></div>
+      </div>
+    </div>
+    <div class="energy-badge">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M11 21l1-9H8l10-10-1 9h4l-10 10z"/></svg>
+      <span id="energyNum">150</span>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="menu-btn" id="headerRestartBtn" aria-label="Restart Game" title="Restart Game">
+        <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.95 7.95 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+      </button>
+      <button class="menu-btn" id="openMenuBtn" aria-label="Settings" title="Settings">
+        <svg viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="battlefield-container">
+    <div class="battlefield" id="battlefield">
+      <div class="toast" id="toast"></div>
+
+      <!-- Lanes -->
+      <div class="lane" data-lane="0"><div class="core-zone">❤️</div></div>
+      <div class="lane" data-lane="1"><div class="core-zone">❤️</div></div>
+      <div class="lane" data-lane="2"><div class="core-zone">❤️</div></div>
+
+      <!-- Start Overlay -->
+      <div class="modal-overlay show" id="startModal">
+        <div class="modal-content">
+          <div class="modal-title">Cycle Defense</div>
+          <div class="modal-sub">
+            Namaste! Yeh game aapko period symptoms ko manage karne ki strategy sikhata hai. Sahi symptoms (enemies) ke liye sahi habits (defenders) ka upyog karein.
+          </div>
+          <button class="btn-primary" id="startBtn">Game Shuru Karein</button>
+        </div>
+      </div>
+
+      <!-- Wave Overlay -->
+      <div class="modal-overlay" id="waveModal">
+        <div class="modal-content">
+          <div class="modal-title" id="waveBannerTitle">Wave Clear!</div>
+          <div class="modal-sub" id="waveBannerSub">Badhai ho! Agli wave jaldi shuru hogi. Apni strategy adjust karein.</div>
+        </div>
+      </div>
+
+      <!-- End Game Overlay -->
+      <div class="modal-overlay" id="endModal">
+        <div class="modal-content">
+          <div class="modal-title" id="endTitle">Game Over</div>
+          <div class="modal-sub" id="endSub">Aapka wellness level kam ho gaya.</div>
+          <div style="display:flex; justify-content:space-around; margin-bottom: 20px;">
+            <div style="text-align:center;">
+              <div style="font-size:24px; font-weight:800; color:var(--energy-color);" id="endWave">1</div>
+              <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Waves Survived</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:24px; font-weight:800; color:var(--energy-color);" id="endKills">0</div>
+              <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Symptoms Cleared</div>
+            </div>
+          </div>
+          <button class="btn-primary" id="restartBtn">Dobara Khelein</button>
+        </div>
+      </div>
+
+      <!-- Restart Confirm Overlay -->
+      <div class="modal-overlay" id="confirmModal">
+        <div class="modal-content">
+          <div class="modal-title">Restart Game?</div>
+          <div class="modal-sub">Kya aap sach mein current game chhodkar shuru se khelna chahte hain?</div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn-primary" style="background:rgba(255,255,255,0.1); color:var(--text-main);" id="cancelRestartBtn">Nahi</button>
+            <button class="btn-primary" style="background:var(--core-color); color:#fff;" id="confirmRestartBtn">Haan, Restart Karein</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Unit Upgrade/Sell Overlay -->
+      <div class="modal-overlay" id="unitModal">
+        <div class="modal-content" style="max-width: 320px;">
+          <div class="modal-title">Defender Manage</div>
+          <div class="modal-sub" id="unitModalStats">Level 1</div>
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <button class="btn-primary" id="btnUpgradeUnit">Upgrade (⚡)</button>
+            <button class="btn-primary" style="background:rgba(255,255,255,0.1); color:var(--text-main);" id="btnSellUnit">Hata Dein (Refund)</button>
+            <button class="btn-primary" style="background:transparent; color:var(--text-muted); box-shadow:none; padding:8px;" id="btnCloseUnitModal">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings / Menu Overlay -->
+      <div class="modal-overlay" id="settingsModal">
+        <div class="modal-content" style="max-width: 400px;">
+          <div class="menu-tabs">
+            <button class="menu-tab active" data-tab="tab-how">Kaise Khelein</button>
+            <button class="menu-tab" data-tab="tab-settings">Settings</button>
+            <button class="menu-tab" data-tab="tab-about">Parichay</button>
+          </div>
+          
+          <!-- Instructions Tab -->
+          <div class="menu-section active menu-scroll" id="tab-how">
+            <p style="margin-bottom:12px; color:#fff; font-weight:600;">Game Ka Uddeshya:</p>
+            <p style="margin-bottom:16px;">Sahi habits (Defenders) ko place karke period symptoms (Enemies) ko rokna hai aur apna Wellness 100% maintain karna hai. Energy jama karein aur jarurat padne par defenders par tap karke unhe <strong>Upgrade</strong> karein!</p>
+            
+            <p style="margin-bottom:12px; color:#fff; font-weight:600;">Defenders (Aapki Takat):</p>
+            <p style="margin-bottom:8px; font-size:12px;">Sahi enemy par sahi defender lagane se damage DOUBLE hota hai.</p>
+            <div class="info-list">
+              <div class="info-item">
+                <div class="info-icon">🔥</div>
+                <div class="info-text">
+                  <strong>Heat (Garam Sek)</strong>
+                  <span>Cramps (⚡) ke khilaf sabse asardaar.</span>
+                  <div style="color: #9CA3AF; font-style: italic; font-size: 11.5px; margin-top: 4px;">💡 <b>Real Life:</b> Jaise hot water bag ya heating pad pet aur kamar dard mein turant aaram dete hain.</div>
+                </div>
+              </div>
+              <div class="info-item">
+                <div class="info-icon">🥬</div>
+                <div class="info-text">
+                  <strong>Iron (Healthy Diet)</strong>
+                  <span>Fatigue (😩) yaani thakan ko mitaye.</span>
+                  <div style="color: #9CA3AF; font-style: italic; font-size: 11.5px; margin-top: 4px;">💡 <b>Real Life:</b> Jaise palak ya anar khane se body ko taqat milti hai aur susti door hoti hai.</div>
+                </div>
+              </div>
+              <div class="info-item">
+                <div class="info-icon">💧</div>
+                <div class="info-text">
+                  <strong>Hydration (Paani)</strong>
+                  <span>Bloating (🎈) ko jaldi khatam kare.</span>
+                  <div style="color: #9CA3AF; font-style: italic; font-size: 11.5px; margin-top: 4px;">💡 <b>Real Life:</b> Jaise khoob paani peene se body se toxins nikalte hain aur pet halka mehsus hota hai.</div>
+                </div>
+              </div>
+              <div class="info-item">
+                <div class="info-icon">😴</div>
+                <div class="info-text">
+                  <strong>Rest (Aaram)</strong>
+                  <span>Mood Swings (🌪️) ko slow karke control kare.</span>
+                  <div style="color: #9CA3AF; font-style: italic; font-size: 11.5px; margin-top: 4px;">💡 <b>Real Life:</b> Jaise ek achi neend lene ke baad mood fresh ho jata hai aur gussa shant hota hai.</div>
+                </div>
+              </div>
+              <div class="info-item">
+                <div class="info-icon">🧘</div>
+                <div class="info-text">
+                  <strong>Yoga (Vyayam)</strong>
+                  <span>Ek sath 2 symptoms par area-damage kare.</span>
+                  <div style="color: #9CA3AF; font-style: italic; font-size: 11.5px; margin-top: 4px;">💡 <b>Real Life:</b> Jaise halki stretching aur deep breathing se poori body ka stress ek sath kam hota hai.</div>
+                </div>
+              </div>
+            </div>
+
+            <p style="margin-top:20px; margin-bottom:12px; color:#fff; font-weight:600;">Enemies (Symptoms):</p>
+            <div class="info-list">
+              <div class="info-item">
+                <div class="info-icon" style="background:var(--enemy-bg); border:1px solid var(--enemy-border); border-radius:50%;">🎈</div>
+                <div class="info-text">
+                  <strong>Bloating</strong>
+                  <span>Tez chalta hai, Hydration se harega.</span>
+                  <div style="color: #9CA3AF; font-style: italic; font-size: 11.5px; margin-top: 4px;">💡 <b>Real Life:</b> Jab periods mein water retention ke karan pet phoola hua aur bhari lagta hai.</div>
+                </div>
+              </div>
+              <div class="info-item">
+                <div class="info-icon" style="background:var(--enemy-bg); border:1px solid var(--enemy-border); border-radius:50%;">⚡</div>
+                <div class="info-text">
+                  <strong>Cramp</strong>
+                  <span>Medium speed, par HP (Health) zyada hai.</span>
+                  <div style="color: #9CA3AF; font-style: italic; font-size: 11.5px; margin-top: 4px;">💡 <b>Real Life:</b> Jab achanak pet ya kamar ke nichle hisse mein tez dard aur marod uthti hai.</div>
+                </div>
+              </div>
+              <div class="info-item">
+                <div class="info-icon" style="background:var(--enemy-bg); border:1px solid var(--enemy-border); border-radius:50%;">😩</div>
+                <div class="info-text">
+                  <strong>Fatigue</strong>
+                  <span>Bahut slow hai, par iski Health sabse zyada hai.</span>
+                  <div style="color: #9CA3AF; font-style: italic; font-size: 11.5px; margin-top: 4px;">💡 <b>Real Life:</b> Jab poora din thakan aur susti lage, aur kisi kaam mein mann na lage.</div>
+                </div>
+              </div>
+              <div class="info-item">
+                <div class="info-icon" style="background:var(--enemy-bg); border:1px solid var(--enemy-border); border-radius:50%;">🌪️</div>
+                <div class="info-text">
+                  <strong>Mood Swing</strong>
+                  <span>Sabse tez enemy! Isko Rest lagakar slow karein.</span>
+                  <div style="color: #9CA3AF; font-style: italic; font-size: 11.5px; margin-top: 4px;">💡 <b>Real Life:</b> Jab bina kisi wajah ke achanak gussa aana, chidchidapan ya rone ka mann karta hai.</div>
+                </div>
+              </div>
+              <div class="info-item">
+                <div class="info-icon" style="background:var(--enemy-bg); border:1px solid var(--enemy-border); border-radius:50%;">👹</div>
+                <div class="info-text">
+                  <strong>PMS Wave (Boss)</strong>
+                  <span>Har 4th wave me aata hai. Bahut powerful hota hai!</span>
+                  <div style="color: #9CA3AF; font-style: italic; font-size: 11.5px; margin-top: 4px;">💡 <b>Real Life:</b> Periods shuru hone se theek pehle ka samay jab saari pareshaniyan ek sath peak par hoti hain.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Settings Tab -->
+          <div class="menu-section" id="tab-settings">
+            <div class="toggle-wrap">
+              <div>
+                <strong>Music (BGM)</strong>
+                <div style="font-size:11px; margin-top:2px;">Background music chalu/band karein</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="musicToggle" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="toggle-wrap">
+              <div>
+                <strong>Sound Effects (SFX)</strong>
+                <div style="font-size:11px; margin-top:2px;">Game ke actions aur taps ki aawaz</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="sfxToggle" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- About Tab -->
+          <div class="menu-section" id="tab-about">
+            <p style="margin-bottom: 10px;"><strong>Cycle Defense Pro</strong> ek mazedar tarika hai self-care ke bare mein sikhne ka.</p>
+            <p style="margin-bottom: 10px;">Hamara uddeshya (goal) hai period aane wale dino mein apni body ka dhyan rakhne ki mahatva ko samjhana.</p>
+            <p>Developed for an interactive & engaging wellness journey.</p>
+          </div>
+
+          <button class="btn-primary" style="margin-top: 20px; padding: 10px;" id="closeMenuBtn">Wapas Khelein</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="tray" id="tray">
+    <!-- Tray items generated via JS -->
+  </div>
+</div>
+
+<script>
+(function(){
+  // --- AUDIO SYSTEM (Tone.js) ---
+  let musicEnabled = true;
+  let sfxEnabled = true;
+  let audioInitialized = false;
+  let bgmVolume, chordSynth, bgmLoop, synthTap, synthError, synthPlace, synthShoot, synthSpawn, synthHit;
+
+  async function initAudio() {
+    if (audioInitialized) return;
+    try {
+      await Tone.start();
+      
+      // UI Sounds
+      synthTap = new Tone.PolySynth(Tone.Synth, { volume: -10 }).toDestination();
+      synthError = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { decay: 0.2 }, volume: -12 }).toDestination();
+      synthPlace = new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 4, volume: -8 }).toDestination();
+      
+      // Action Sounds
+      synthShoot = new Tone.FMSynth({ modulationIndex: 10, oscillator: { type: 'sine' }, volume: -15 }).toDestination();
+      synthSpawn = new Tone.MembraneSynth({ pitchDecay: 0.2, octaves: 2, volume: -15 }).toDestination();
+      synthHit = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.005, decay: 0.1, sustain: 0 }, volume: -18 }).toDestination();
+      
+      // BGM - Uplifting Arpeggio Melody
+      bgmVolume = new Tone.Volume(-20).toDestination();
+      chordSynth = new Tone.Synth({
+        oscillator: { type: "sine" },
+        envelope: { attack: 0.05, decay: 0.3, sustain: 0.1, release: 1 }
+      }).connect(bgmVolume);
+
+      const sequence = ["C4", "E4", "G4", "E4", "A4", "G4", "E4", "G4", "F4", "A4", "C5", "A4", "G4", "E4", "D4", "G4"];
+      let step = 0;
+      
+      bgmLoop = new Tone.Loop((time) => {
+        chordSynth.triggerAttackRelease(sequence[step % sequence.length], "8n", time);
+        step++;
+      }, "8n").start(0);
+      
+      Tone.Transport.bpm.value = 110; // Engaging & melodic tempo
+      Tone.Transport.start();
+      
+      audioInitialized = true;
+      if(!musicEnabled) bgmVolume.mute = true;
+    } catch (e) { console.error("Audio init failed:", e); }
+  }
+
+  const Audio = {
+    _lastPlay: {},
+    _throttle: function(key, delay, callback) {
+      if (!sfxEnabled) return;
+      const now = Tone.now();
+      // Only play the sound if enough time has passed since the last identical sound
+      if (now - (this._lastPlay[key] || 0) > delay) {
+        this._lastPlay[key] = now;
+        callback(now);
+      }
+    },
+    tap: function() { this._throttle('tap', 0.05, (now) => synthTap && synthTap.triggerAttackRelease(["C5", "E5"], "32n", now)); },
+    error: function() { this._throttle('error', 0.05, (now) => synthError && synthError.triggerAttackRelease("G2", "16n", now)); },
+    place: function() { this._throttle('place', 0.05, (now) => synthPlace && synthPlace.triggerAttackRelease("C3", "16n", now)); },
+    remove: function() { this._throttle('remove', 0.05, (now) => synthTap && synthTap.triggerAttackRelease("C4", "16n", now)); },
+    shoot: function(type) { 
+      this._throttle('shoot', 0.05, (now) => {
+        if (!synthShoot) return;
+        const pitches = { hydration: 'C5', iron: 'E4', heat: 'G4', rest: 'A3', yoga: 'C4' };
+        synthShoot.triggerAttackRelease(pitches[type] || 'C4', "32n", now); 
+      });
+    },
+    spawn: function() { this._throttle('spawn', 0.08, (now) => synthSpawn && synthSpawn.triggerAttackRelease("C2", "8n", now)); },
+    hit: function() { this._throttle('hit', 0.05, (now) => synthHit && synthHit.triggerAttackRelease("16n", now)); },
+    coreHit: function() { this._throttle('coreHit', 0.1, (now) => synthError && synthError.triggerAttackRelease("C2", "8n", now)); }
+  };
+
+  document.getElementById('musicToggle').addEventListener('change', async (e) => {
+    musicEnabled = e.target.checked;
+    if(musicEnabled && !audioInitialized) await initAudio();
+    if(bgmVolume) bgmVolume.mute = !musicEnabled;
+  });
+
+  document.getElementById('sfxToggle').addEventListener('change', async (e) => {
+    sfxEnabled = e.target.checked;
+    if(sfxEnabled && !audioInitialized) await initAudio();
+    if(sfxEnabled) Audio.tap();
+  });
+
+  const LANES = 3;
+  const COLS = [20, 38, 56, 74, 92]; // Shifted right to prevent overlap with the core zone
+  const TOTAL_WAVES = 12;
+
+  const DEFENDERS = {
+    hydration: { name:'Hydration', icon:'💧', cost:50, dmg:12, bonusDmg:26, interval:900, range:18, weakness:'bloat', cls:'def-hydration', color:'#38BDF8' },
+    iron:      { name:'Iron',      icon:'🥬', cost:75, dmg:18, bonusDmg:38, interval:1100, range:20, weakness:'fatigue', cls:'def-iron', color:'#4ADE80' },
+    heat:      { name:'Heat',      icon:'🔥', cost:100, dmg:26, bonusDmg:70, interval:1500, range:15, weakness:'cramp', cls:'def-heat', color:'#FB923C' },
+    rest:      { name:'Rest',      icon:'😴', cost:60, dmg:9, bonusDmg:15, interval:1300, range:22, weakness:'mood', cls:'def-rest', slow:true, color:'#A78BFA' },
+    yoga:      { name:'Yoga',      icon:'🧘', cost:90, dmg:10, bonusDmg:10, interval:1200, range:25, weakness:null, cls:'def-yoga', splash:true, color:'#2DD4BF' }
+  };
+
+  const ENEMIES = {
+    bloat:   { name:'Bloating',  icon:'🎈', hp:36,  speed:6.0, reward:14, dmgToCore:8 },
+    cramp:   { name:'Cramp',     icon:'⚡', hp:65,  speed:4.0, reward:18, dmgToCore:12 },
+    fatigue: { name:'Fatigue',   icon:'😩', hp:110, speed:2.5, reward:24, dmgToCore:15 },
+    mood:    { name:'Mood Swing',icon:'🌪️', hp:50, speed:7.5, reward:20, dmgToCore:10 },
+    boss:    { name:'PMS Wave',  icon:'👹', hp:280, speed:2.5, reward:70, dmgToCore:25 }
+  };
+
+  // DOM Elements
+  const els = {
+    battlefield: document.getElementById('battlefield'),
+    lanes: [0,1,2].map(i => document.querySelector(`.lane[data-lane="${i}"]`)),
+    tray: document.getElementById('tray'),
+    toast: document.getElementById('toast'),
+    wellnessFill: document.getElementById('wellnessFill'),
+    wellnessNum: document.getElementById('wellnessNum'),
+    energyNum: document.getElementById('energyNum'),
+    waveNum: document.getElementById('waveNum'),
+    modals: {
+      start: document.getElementById('startModal'),
+      wave: document.getElementById('waveModal'),
+      end: document.getElementById('endModal'),
+      settings: document.getElementById('settingsModal'),
+      confirm: document.getElementById('confirmModal'),
+      unit: document.getElementById('unitModal')
+    }
+  };
+
+  let state = {
+    energy: 150, wellness: 100, wave: 0, kills: 0,
+    selectedType: null, isRunning: false, isPaused: false,
+    grid: [0,1,2].map(()=>COLS.map(()=>null)),
+    enemies: [], defenders: [], uidCounter: 1,
+    waveQueue: [], waveSpawnTimer: 0, waveStarted: false, waveClearedShown: false,
+    energyTimer: 0, lastTime: 0, waveStartTime: 0,
+    selectedUnitForAction: null
+  };
+
+  let waveClearInterval = null;
+
+  function showToast(msg) {
+    els.toast.textContent = msg;
+    els.toast.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => els.toast.classList.remove('show'), 1500);
+  }
+
+  function updateHud() {
+    els.energyNum.textContent = Math.floor(state.energy);
+    els.wellnessNum.textContent = Math.max(0, Math.round(state.wellness)) + '%';
+    els.wellnessFill.style.width = Math.max(0, state.wellness) + '%';
+    els.waveNum.textContent = state.wave;
+    refreshTraySelection();
+  }
+
+  function buildSlots() {
+    els.lanes.forEach((laneEl, laneIdx) => {
+      COLS.forEach((x, colIdx) => {
+        const slot = document.createElement('div');
+        slot.className = 'slot';
+        slot.style.left = x + '%';
+        slot.dataset.lane = laneIdx;
+        slot.dataset.col = colIdx;
+        slot.addEventListener('click', onSlotClick);
+        laneEl.appendChild(slot);
+      });
+    });
+  }
+
+  function buildTrayBtn(type) {
+    const d = DEFENDERS[type];
+    const btn = document.createElement('button');
+    btn.className = 'tray-btn';
+    btn.dataset.type = type;
+    btn.innerHTML = `<div class="ic">${d.icon}</div><div class="nm">${d.name}</div><div class="ct">⚡${d.cost}</div>`;
+    btn.addEventListener('click', () => {
+      if(state.selectedType === type) state.selectedType = null;
+      else state.selectedType = type;
+      Audio.tap();
+      refreshTraySelection();
+      refreshSlotHighlight();
+    });
+    els.tray.appendChild(btn);
+  }
+
+  function refreshTraySelection() {
+    els.tray.querySelectorAll('.tray-btn').forEach(btn => {
+      btn.classList.toggle('selected', btn.dataset.type === state.selectedType);
+      btn.disabled = state.energy < DEFENDERS[btn.dataset.type].cost;
+    });
+  }
+
+  function refreshSlotHighlight() {
+    els.battlefield.querySelectorAll('.slot').forEach(slot => {
+      const lane = +slot.dataset.lane, col = +slot.dataset.col;
+      const occupied = !!state.grid[lane][col];
+      slot.classList.toggle('occupied', occupied);
+      slot.classList.toggle('placeable', !occupied && !!state.selectedType && state.isRunning && !state.isPaused);
+    });
+  }
+
+  function onSlotClick(e) {
+    const slot = e.currentTarget;
+    const lane = +slot.dataset.lane, col = +slot.dataset.col;
+    const existing = state.grid[lane][col];
+
+    if (existing) {
+      state.selectedUnitForAction = existing;
+      openUnitModal();
+      return;
+    }
+
+    if (!state.isRunning || state.isPaused) return;
+    if (!state.selectedType) { Audio.error(); showToast('Kripya pehle ek defender chunein'); return; }
+    
+    const d = DEFENDERS[state.selectedType];
+    if (state.energy < d.cost) { Audio.error(); showToast('Aparyapt Energy'); return; }
+
+    state.energy -= d.cost;
+    const uid = state.uidCounter++;
+    const unit = { uid, type: state.selectedType, lane, col, x: COLS[col], lastFire: 0, level: 1 };
+    state.grid[lane][col] = unit;
+    state.defenders.push(unit);
+    
+    renderDefender(unit);
+    Audio.place();
+    state.selectedType = null; // Auto-deselect after placement for better UX on mobile
+    updateHud();
+    refreshSlotHighlight();
+  }
+
+  function renderDefender(unit) {
+    const d = DEFENDERS[unit.type];
+    let el = els.battlefield.querySelector(`[data-uid="${unit.uid}"]`);
+    
+    if (!el) {
+      el = document.createElement('div');
+      el.className = `unit defender ${d.cls}`;
+      el.style.left = unit.x + '%';
+      el.dataset.uid = unit.uid;
+      el.addEventListener('click', () => {
+        if(!state.isPaused) els.battlefield.querySelector(`.slot[data-lane="${unit.lane}"][data-col="${unit.col}"]`).click();
+      });
+      els.lanes[unit.lane].appendChild(el);
+    }
+    
+    const stars = '⭐'.repeat(unit.level || 1);
+    el.innerHTML = `
+      <div class="lvl-badge" style="display: ${unit.level > 1 ? 'block' : 'none'};">${stars}</div>
+      <div class="icon-wrap">${d.icon}</div>
+    `;
+  }
+
+  function removeElement(uid) {
+    const el = els.battlefield.querySelector(`[data-uid="${uid}"]`);
+    if (el) el.remove();
+  }
+
+  function buildWave(n) {
+    const counts = { bloat: 2 + n, cramp: Math.max(0, n - 1), fatigue: Math.floor(n / 2), mood: Math.max(0, n - 2) };
+    
+    // --- Difficulty Spikes for Late Waves ---
+    if (n >= 10) { counts.cramp += 2; counts.fatigue += 1; counts.mood += 1; }
+    if (n >= 11) { counts.bloat += 3; counts.cramp += 3; counts.fatigue += 2; counts.mood += 2; }
+    if (n === 12) { counts.bloat += 5; counts.cramp += 5; counts.fatigue += 4; counts.mood += 4; }
+
+    let list = [];
+    Object.keys(counts).forEach(t => { for(let i=0; i<counts[t]; i++) list.push(t); });
+    
+    // Boss Logic
+    let bossCount = 0;
+    if (n % 4 === 0) bossCount = 1;
+    if (n === 10) bossCount = 1; // Extra boss for wave 10 challenge
+    if (n === 11) bossCount = 2; // Double boss for wave 11
+    if (n === 12) bossCount = 4; // Final wave ultimate challenge
+    
+    for(let i=0; i<bossCount; i++) list.push('boss');
+    
+    // Shuffle array
+    for (let i = list.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [list[i], list[j]] = [list[j], list[i]];
+    }
+    
+    let delay = 500;
+    // Dynamically reduce spawn delay to make enemies cluster more on higher waves
+    const baseDelay = Math.max(200, 600 - (n * 25)); 
+    const varDelay = Math.max(100, 400 - (n * 20));
+
+    return list.map(type => {
+      const cfg = { type, lane: Math.floor(Math.random() * LANES), delay };
+      delay += baseDelay + (Math.random() * varDelay);
+      return cfg;
+    });
+  }
+
+  function startWave(n) {
+    state.wave = n;
+    state.waveQueue = buildWave(n);
+    state.waveStarted = true;
+    state.waveClearedShown = false;
+    updateHud();
+  }
+
+  function spawnEnemy(type, lane) {
+    const base = ENEMIES[type];
+    const diff = 1 + (state.wave - 1) * 0.08; // Difficulty scaling
+    const enemy = {
+      uid: state.uidCounter++, type, lane, x: 100,
+      hp: base.hp * (1 + (state.wave-1)*0.1), maxHp: base.hp * (1 + (state.wave-1)*0.1),
+      baseSpeed: base.speed * diff, reward: base.reward, dmgToCore: base.dmgToCore,
+      slowUntil: 0
+    };
+    state.enemies.push(enemy);
+    
+    const el = document.createElement('div');
+    el.className = 'unit enemy';
+    el.dataset.uid = enemy.uid;
+    el.style.left = '100%';
+    el.innerHTML = `<div class="hp-bar-container"><div class="hp-fill" style="width:100%"></div></div><div class="icon-wrap">${base.icon}</div>`;
+    els.lanes[lane].appendChild(el);
+    Audio.spawn();
+  }
+
+  function createProjectile(fromX, toX, lane, color) {
+    const el = document.createElement('div');
+    el.className = 'projectile';
+    el.style.left = fromX + '%';
+    el.style.top = '50%';
+    el.style.transform = 'translate(-50%, -50%)';
+    el.style.boxShadow = `0 0 8px ${color}`;
+    els.lanes[lane].appendChild(el);
+    
+    // Animate to target
+    setTimeout(() => { el.style.left = toX + '%'; }, 20);
+    setTimeout(() => { el.remove(); }, 170); // Match CSS transition
+  }
+
+  function damageEnemy(enemy, dmg, isSlow, slowDuration) {
+    enemy.hp -= dmg;
+    const el = els.battlefield.querySelector(`.unit[data-uid="${enemy.uid}"]`);
+    if (el) {
+      el.classList.add('hit');
+      setTimeout(() => el.classList.remove('hit'), 150);
+      const fill = el.querySelector('.hp-fill');
+      if (fill) fill.style.width = Math.max(0, (enemy.hp / enemy.maxHp * 100)) + '%';
+    }
+    
+    if (isSlow) {
+      enemy.slowUntil = performance.now() + slowDuration;
+      if (el) el.classList.add('slowed');
+    }
+    Audio.hit();
+  }
+
+  function killEnemy(enemy) {
+    state.energy += enemy.reward;
+    state.kills++;
+    removeElement(enemy.uid);
+    state.enemies = state.enemies.filter(e => e.uid !== enemy.uid);
+    updateHud();
+  }
+
+  function enemyReachedCore(enemy) {
+    state.wellness -= enemy.dmgToCore;
+    removeElement(enemy.uid);
+    state.enemies = state.enemies.filter(e => e.uid !== enemy.uid);
+    Audio.coreHit();
+    
+    // Visual shake on body
+    document.body.style.transform = 'translate(4px, 2px)';
+    setTimeout(() => document.body.style.transform = 'translate(-4px, -2px)', 50);
+    setTimeout(() => document.body.style.transform = 'translate(0, 0)', 100);
+
+    updateHud();
+    if (state.wellness <= 0) endGame(false);
+  }
+
+  function tickDefenders(now, dt) {
+    state.defenders.forEach(unit => {
+      const d = DEFENDERS[unit.type];
+      
+      // Level Math
+      const L = unit.level || 1;
+      const dmgMult = L === 1 ? 1 : (L === 2 ? 1.5 : 2.2);
+      const speedMult = L === 1 ? 1 : (L === 2 ? 0.85 : 0.7);
+
+      if (now - unit.lastFire < d.interval * speedMult) return;
+      
+      const laneEnemies = state.enemies.filter(e => e.lane === unit.lane && e.x > unit.x && (e.x - unit.x) <= d.range);
+      if (laneEnemies.length === 0) return;
+      
+      laneEnemies.sort((a, b) => a.x - b.x);
+      const targets = d.splash ? laneEnemies.slice(0, 2) : laneEnemies.slice(0, 1);
+      
+      let fired = false;
+      targets.forEach(t => {
+        const isWeak = d.weakness && t.type === d.weakness;
+        const dmg = (isWeak ? d.bonusDmg : d.dmg) * dmgMult;
+        const slowDur = (d.weakness === 'mood' && t.type === 'mood') ? 3500 : 2000;
+        
+        createProjectile(unit.x, t.x, unit.lane, d.color);
+        setTimeout(() => damageEnemy(t, dmg, !!d.slow, slowDur), 150);
+        fired = true;
+      });
+      
+      if(fired) {
+        unit.lastFire = now;
+        Audio.shoot(unit.type);
+      }
+    });
+
+    state.enemies.forEach(e => { if (e.hp <= 0) killEnemy(e); });
+  }
+
+  function tickEnemies(now, dt) {
+    state.enemies.forEach(e => {
+      let spd = e.baseSpeed;
+      if (now < e.slowUntil) spd *= 0.4;
+      else {
+        const el = els.battlefield.querySelector(`.unit[data-uid="${e.uid}"]`);
+        if (el) el.classList.remove('slowed');
+      }
+      e.x -= spd * dt;
+      const el = els.battlefield.querySelector(`.unit[data-uid="${e.uid}"]`);
+      if (el) el.style.left = e.x + '%';
+    });
+    
+    const arrived = state.enemies.filter(e => e.x <= 10);
+    arrived.forEach(enemyReachedCore);
+  }
+
+  function loop(ts) {
+    if (!state.lastTime) state.lastTime = ts;
+    const dt = Math.min((ts - state.lastTime) / 1000, 0.05);
+    state.lastTime = ts;
+
+    if (state.isRunning && !state.isPaused) {
+      if (state.waveStarted) {
+        if (!state.waveStartTime) state.waveStartTime = ts;
+        const elapsed = ts - state.waveStartTime;
+        
+        // Spawn
+        while (state.waveQueue.length && state.waveQueue[0].delay <= elapsed) {
+          const cfg = state.waveQueue.shift();
+          spawnEnemy(cfg.type, cfg.lane);
+        }
+
+        tickDefenders(ts, dt);
+        tickEnemies(ts, dt);
+
+        // Passive Energy
+        state.energyTimer += dt;
+        if (state.energyTimer >= 1.5) {
+          state.energyTimer = 0;
+          state.energy += 3; // slightly faster passive income
+          updateHud();
+        }
+
+        // Wave Clear check
+        if (state.waveQueue.length === 0 && state.enemies.length === 0 && !state.waveClearedShown) {
+          state.waveClearedShown = true;
+          onWaveClear();
+        }
+      }
+    }
+    requestAnimationFrame(loop);
+  }
+
+  function onWaveClear() {
+    state.energy += 40;
+    updateHud();
+    if (state.wave >= TOTAL_WAVES) { endGame(true); return; }
+    
+    state.isRunning = false;
+    document.getElementById('waveBannerTitle').textContent = `Wave ${state.wave} Clear! 🎉`;
+    document.getElementById('waveBannerSub').textContent = `+40 Bonus Energy. Agli wave 5 second mein shuru hogi.`;
+    els.modals.wave.classList.add('show');
+    
+    let secs = 5;
+    if (waveClearInterval) clearInterval(waveClearInterval);
+    
+    waveClearInterval = setInterval(() => {
+      secs--;
+      document.getElementById('waveBannerSub').textContent = `Agli wave ${secs} second mein shuru hogi.`;
+      if (secs <= 0) {
+        clearInterval(waveClearInterval);
+        waveClearInterval = null;
+        els.modals.wave.classList.remove('show');
+        state.isRunning = true;
+        state.waveStartTime = 0; // reset for new wave
+        startWave(state.wave + 1);
+      }
+    }, 1000);
+  }
+
+  function endGame(won) {
+    state.isRunning = false;
+    document.getElementById('endTitle').textContent = won ? 'Cycle Protected! 🌸' : 'Game Over';
+    document.getElementById('endSub').textContent = won
+      ? 'Aapne sabhi 12 waves safaltapoorvak clear kar li. Aapka wellness poori tarah surakshit hai!'
+      : 'Aapka wellness level kam ho gaya hai. Strategy aur sahi defender matching par dhyan dekar dobara prayas karein.';
+    document.getElementById('endWave').textContent = state.wave;
+    document.getElementById('endKills').textContent = state.kills;
+    els.modals.end.classList.add('show');
+  }
+
+  function resetState() {
+    // Clear any active wave interval so it doesn't interrupt the new game
+    if (waveClearInterval) {
+      clearInterval(waveClearInterval);
+      waveClearInterval = null;
+    }
+    els.modals.wave.classList.remove('show');
+
+    // Fully reset all state variables
+    state = { 
+      ...state, energy: 150, wellness: 100, wave: 0, kills: 0, 
+      selectedType: null, isRunning: false, isPaused: false, 
+      grid: [0,1,2].map(()=>COLS.map(()=>null)), 
+      enemies: [], defenders: [], uidCounter: 1, 
+      waveQueue: [], waveStarted: false, waveClearedShown: false,
+      energyTimer: 0, lastTime: 0, waveStartTime: 0,
+      selectedUnitForAction: null
+    };
+    
+    els.lanes.forEach(l => l.querySelectorAll('.slot, .unit, .projectile').forEach(n => n.remove()));
+    buildSlots();
+    updateHud();
+    els.tray.innerHTML = '';
+    Object.keys(DEFENDERS).forEach(buildTrayBtn);
+  }
+
+  document.getElementById('startBtn').addEventListener('click', async () => {
+    els.modals.start.classList.remove('show');
+    if((musicEnabled || sfxEnabled) && !audioInitialized) {
+      await initAudio();
+    }
+    state.isRunning = true;
+    state.waveStartTime = 0;
+    startWave(1);
+    Audio.tap();
+  });
+
+  document.getElementById('restartBtn').addEventListener('click', () => {
+    els.modals.end.classList.remove('show');
+    resetState();
+    els.modals.start.classList.add('show');
+    Audio.tap();
+  });
+
+  // NEW: Restart Game Flow
+  document.getElementById('headerRestartBtn').addEventListener('click', () => {
+    if(!state.isRunning && state.wave === 0) return; // Ignore if game hasn't even started
+    state.isPaused = true;
+    els.modals.confirm.classList.add('show');
+    Audio.tap();
+  });
+
+  document.getElementById('cancelRestartBtn').addEventListener('click', () => {
+    els.modals.confirm.classList.remove('show');
+    state.isPaused = false;
+    state.lastTime = performance.now(); // reset timer delta to avoid lag spikes
+    Audio.tap();
+  });
+
+  document.getElementById('confirmRestartBtn').addEventListener('click', () => {
+    els.modals.confirm.classList.remove('show');
+    resetState();
+    state.isRunning = true;
+    state.waveStartTime = 0;
+    startWave(1);
+    Audio.tap();
+  });
+
+  document.getElementById('openMenuBtn').addEventListener('click', () => {
+    state.isPaused = true;
+    els.modals.settings.classList.add('show');
+    Audio.tap();
+  });
+
+  document.getElementById('closeMenuBtn').addEventListener('click', () => {
+    els.modals.settings.classList.remove('show');
+    state.isPaused = false;
+    // reset lastTime to avoid huge delta jump
+    state.lastTime = performance.now(); 
+    Audio.tap();
+  });
+
+  // Settings Tabs Logic
+  document.querySelectorAll('.menu-tab').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      document.querySelectorAll('.menu-tab').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.menu-section').forEach(s => s.classList.remove('active'));
+      
+      const targetId = e.target.getAttribute('data-tab');
+      e.target.classList.add('active');
+      document.getElementById(targetId).classList.add('active');
+      Audio.tap();
+    });
+  });
+
+  // Upgrade & Sell Logic
+  function getUnitCost(type, level) {
+    const base = DEFENDERS[type].cost;
+    return Math.round(base * (level === 1 ? 1.5 : 2.0));
+  }
+  
+  function getUnitRefund(unit) {
+    const base = DEFENDERS[unit.type].cost;
+    let total = base;
+    if (unit.level > 1) total += getUnitCost(unit.type, 1);
+    if (unit.level > 2) total += getUnitCost(unit.type, 2);
+    return Math.round(total * 0.5);
+  }
+
+  function openUnitModal() {
+    const unit = state.selectedUnitForAction;
+    if (!unit) return;
+    
+    state.isPaused = true;
+    const d = DEFENDERS[unit.type];
+    const upgCost = getUnitCost(unit.type, unit.level);
+    const refund = getUnitRefund(unit);
+    
+    document.getElementById('unitModalStats').innerHTML = `
+      <div style="font-size:18px; font-weight:800; color:${d.color}; margin-bottom:5px;">${d.icon} ${d.name}</div>
+      Level ${unit.level} ${unit.level >= 3 ? '(MAX)' : ''}
+    `;
+    
+    const btnUpgrade = document.getElementById('btnUpgradeUnit');
+    if (unit.level >= 3) {
+      btnUpgrade.textContent = 'Max Level Reached';
+      btnUpgrade.disabled = true;
+      btnUpgrade.style.opacity = '0.5';
+    } else {
+      btnUpgrade.textContent = `Upgrade (⚡${upgCost})`;
+      btnUpgrade.disabled = state.energy < upgCost;
+      btnUpgrade.style.opacity = state.energy < upgCost ? '0.5' : '1';
+    }
+    
+    document.getElementById('btnSellUnit').textContent = `Hata Dein (Refund: ⚡${refund})`;
+    
+    els.modals.unit.classList.add('show');
+    Audio.tap();
+  }
+
+  document.getElementById('btnCloseUnitModal').addEventListener('click', () => {
+    els.modals.unit.classList.remove('show');
+    state.isPaused = false;
+    state.lastTime = performance.now();
+    state.selectedUnitForAction = null;
+    Audio.tap();
+  });
+
+  document.getElementById('btnUpgradeUnit').addEventListener('click', () => {
+    const unit = state.selectedUnitForAction;
+    if (!unit || unit.level >= 3) return;
+    const cost = getUnitCost(unit.type, unit.level);
+    
+    if (state.energy >= cost) {
+      state.energy -= cost;
+      unit.level++;
+      renderDefender(unit);
+      showToast(`${DEFENDERS[unit.type].name} Upgraded to Lvl ${unit.level}!`);
+      updateHud();
+      Audio.place();
+      
+      els.modals.unit.classList.remove('show');
+      state.isPaused = false;
+      state.lastTime = performance.now();
+      state.selectedUnitForAction = null;
+    }
+  });
+
+  document.getElementById('btnSellUnit').addEventListener('click', () => {
+    const unit = state.selectedUnitForAction;
+    if (!unit) return;
+    
+    const refund = getUnitRefund(unit);
+    state.energy += refund;
+    
+    removeElement(unit.uid);
+    state.grid[unit.lane][unit.col] = null;
+    state.defenders = state.defenders.filter(d => d.uid !== unit.uid);
+    
+    showToast(`Defender Hataya · ⚡+${refund}`);
+    updateHud();
+    refreshSlotHighlight();
+    Audio.remove();
+    
+    els.modals.unit.classList.remove('show');
+    state.isPaused = false;
+    state.lastTime = performance.now();
+    state.selectedUnitForAction = null;
+  });
+
+  // Init
+  resetState();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

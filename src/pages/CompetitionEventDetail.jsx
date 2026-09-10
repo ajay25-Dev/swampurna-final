@@ -41,6 +41,9 @@ const fallbackEvents = [
   { title: 'Storytelling and Short Film Festival', subtitle: 'December 15th, 2026', description: 'Share compelling stories around menstrual health and social stigma via short films.', image_url: image3, tag: 'upcoming', sort_order: 2, link_url: 'https://docs.google.com/forms/d/e/1FAIpQLSfC8IFaUgQpJCX3ZrVSZZy92KeunqW6KIdTuScYWoM8e1FgaQ/viewform', meta: { location: 'Online and In-Person', buttonText: 'Submit Your Film', color: 'accent' } },
 ];
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+const submitUrl = API_BASE_URL ? `${API_BASE_URL}/api/v1/event-registrations/submit` : '/api/v1/event-registrations/submit';
+
 const CompetitionEventDetail = () => {
   const { eventSlug: slugParam } = useParams();
   const { items } = useContentItems({
@@ -51,6 +54,39 @@ const CompetitionEventDetail = () => {
   const event = (items || []).find((it, idx) => eventSlug(it, idx) === slugParam);
   const [form, setForm] = useState({ name: '', email: '', phone: '', details: '' });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
+  const onSubmitForm = async () => {
+    setSubmitError('');
+    if (!form.name.trim()) {
+      setSubmitError('Please enter your name.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch(submitUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_title: event?.title || '',
+          event_slug: slugParam,
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          details: form.details,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'Submission failed');
+      setSubmitted(true);
+      setForm({ name: '', email: '', phone: '', details: '' });
+    } catch (err) {
+      setSubmitError(err.message || 'Submission failed. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (!event) {
     return (
@@ -79,12 +115,14 @@ const CompetitionEventDetail = () => {
           <textarea rows="5" value={form.details} onChange={(e) => setForm({ ...form, details: e.target.value })} placeholder="Related details" />
           <button
             type="button"
-            onClick={() => setSubmitted(true)}
+            onClick={onSubmitForm}
+            disabled={submitting}
           >
-            Submit
+            {submitting ? 'Submitting...' : 'Submit'}
           </button>
         </div>
         {submitted && <div className="msg">Submitted successfully.</div>}
+        {submitError && <div className="msg error">{submitError}</div>}
         {event.link_url ? (
           <a className="external-btn" href={event.link_url} target="_blank" rel="noopener noreferrer">
             Open Registration Link
@@ -108,8 +146,10 @@ const Wrap = styled.div`
   .form-grid { display: grid; gap: var(--space-3); }
   input, textarea { padding: var(--space-3) var(--space-4); border: 1px solid var(--color-dark-200); border-radius: var(--radius-lg); background: #f9fafb; }
   button, .external-btn { width: fit-content; padding: var(--space-3) var(--space-5); border-radius: var(--radius-full); background: var(--gradient-primary); color: #fff; font-weight: 600; }
+  button:disabled { opacity: 0.7; cursor: not-allowed; }
   .external-btn { display: inline-flex; margin-top: var(--space-3); }
   .msg { margin-top: var(--space-2); color: var(--color-secondary-700); font-weight: 600; }
+  .msg.error { color: #dc2626; }
 `;
 
 export default CompetitionEventDetail;

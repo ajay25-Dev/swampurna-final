@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CYCLE QUEST - 2 Month Journey</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Nunito', 'sans-serif'] },
+                    boxShadow: {
+                        'board': '0 20px 40px -10px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.2)',
+                        'token': '0 4px 6px rgba(0,0,0,0.6), inset 0 -2px 0 rgba(0,0,0,0.3)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            /* Default Improved Deep Theme */
+            --phase1: #e11d48; /* Rose */
+            --phase2: #0d9488; /* Teal */
+            --phase3: #d97706; /* Amber */
+            --phase4: #4f46e5; /* Indigo */
+            --bg-main: #f1f5f9; /* Slate 50 */
+            --board-bg: #ffffff;
+        }
+        [data-theme="neon"] {
+            --phase1: #db2777; --phase2: #65a30d; --phase3: #0284c7; --phase4: #7e22ce;
+            --bg-main: #171717; --board-bg: #262626;
+        }
+        [data-theme="pastel"] {
+            --phase1: #f87171; --phase2: #4ade80; --phase3: #facc15; --phase4: #38bdf8;
+            --bg-main: #d4a373; --board-bg: #fdf6e3;
+        }
+        
+        .phase1-bg { background-color: var(--phase1); color: white; border-color: rgba(255,255,255,0.2); }
+        .phase2-bg { background-color: var(--phase2); color: white; border-color: rgba(255,255,255,0.2); }
+        .phase3-bg { background-color: var(--phase3); color: white; border-color: rgba(255,255,255,0.2); }
+        .phase4-bg { background-color: var(--phase4); color: white; border-color: rgba(255,255,255,0.2); }
+        
+        body {
+            background-color: var(--bg-main);
+            transition: background-color 0.5s ease;
+        }
+
+        .board-bg-custom {
+            background-color: var(--board-bg);
+            transition: background-color 0.5s ease;
+        }
+
+        .cell { transition: transform 0.2s ease, box-shadow 0.2s ease; border-width: 2px; }
+        .cell:hover { transform: scale(1.05); z-index: 10; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); }
+        
+        .player-token { transition: top 0.5s ease-in-out, left 0.5s ease-in-out, transform 0.2s ease; z-index: 20; position: absolute; }
+        
+        /* Token Selection Highlight */
+        .selected-avatar {
+            background-color: #fce7f3 !important; 
+            border-color: #db2777 !important;
+            box-shadow: 0 0 0 4px rgba(219, 39, 119, 0.2);
+            transform: scale(1.15);
+            z-index: 10;
+        }
+
+        /* 3D Dice CSS */
+        .dice-scene { width: 60px; height: 60px; perspective: 600px; margin-right: 15px; transition: transform 0.3s ease; }
+        .dice-cube { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 1s cubic-bezier(0.175, 0.885, 0.32, 1.275); transform: translateZ(-30px); }
+        .dice-face { position: absolute; width: 60px; height: 60px; background: white; border: 2px solid #cbd5e1; border-radius: 8px; box-shadow: inset 0 0 12px rgba(0,0,0,0.1); padding: 8px; box-sizing: border-box; display: flex; justify-content: space-between; }
+        
+        .dice-front  { transform: rotateY(  0deg) translateZ(30px); }
+        .dice-right  { transform: rotateY( 90deg) translateZ(30px); }
+        .dice-back   { transform: rotateY(180deg) translateZ(30px); }
+        .dice-left   { transform: rotateY(-90deg) translateZ(30px); }
+        .dice-top    { transform: rotateX( 90deg) translateZ(30px); }
+        .dice-bottom { transform: rotateX(-90deg) translateZ(30px); }
+
+        .dot { width: 12px; height: 12px; background-color: #334155; border-radius: 50%; display: block; box-shadow: inset 0 2px 4px rgba(0,0,0,0.4); }
+        .dice-col { display: flex; flex-direction: column; justify-content: space-between; align-items: center; }
+
+        @keyframes diceJump {
+            0% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-40px) scale(1.1); }
+            100% { transform: translateY(0) scale(1); }
+        }
+        .dice-jumping { animation: diceJump 0.8s cubic-bezier(0.25, 1.2, 0.5, 1); }
+
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .board-constraint { width: 100%; max-width: min(100%, calc((100dvh - 280px) * (7/8))); aspect-ratio: 7 / 8; max-height: 100%; }
+        #confetti-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+        
+        /* Modal Tabs */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .tab-btn.active { border-bottom: 4px solid #ec4899; color: #ec4899; font-weight: 900; }
+    </style>
+</head>
+<body class="min-h-[100dvh] text-gray-800 overflow-hidden flex flex-col transition-colors">
+
+    <canvas id="confetti-canvas" class="hidden fixed inset-0 w-full h-full pointer-events-none z-[100]"></canvas>
+
+    <!-- SCREEN 1: SETUP SCREEN -->
+    <div id="screen-setup" class="w-full max-w-md mx-auto p-4 flex-1 flex items-center justify-center overflow-y-auto hide-scroll z-10">
+        <div class="w-full bg-white rounded-[2rem] p-6 shadow-2xl border-[8px] border-gray-100 flex flex-col gap-6 relative shrink-0">
+            <div class="absolute top-3 left-1/2 -translate-x-1/2 w-3 h-3 bg-gray-300 rounded-full"></div>
+            
+            <div class="text-center mt-4">
+                <h1 class="text-3xl font-black text-pink-500 tracking-wider drop-shadow-sm leading-tight">CYCLE QUEST</h1>
+                <p class="text-gray-500 font-bold mt-1 uppercase text-xs tracking-widest">2-Month Journey</p>
+            </div>
+
+            <div class="flex flex-col gap-6">
+                <!-- Player Count Selection -->
+                <div class="flex flex-col gap-2">
+                    <label class="font-bold text-sm text-gray-700 text-center">Number of Players:</label>
+                    <div class="flex justify-center gap-2">
+                        <button class="player-count-btn bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-xl border-2 border-transparent transition-colors" data-count="1">1</button>
+                        <button class="player-count-btn bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-xl border-2 border-transparent transition-colors" data-count="2">2</button>
+                        <button class="player-count-btn bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-xl border-2 border-transparent transition-colors" data-count="3">3</button>
+                        <button class="player-count-btn bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-xl border-2 border-transparent transition-colors" data-count="4">4</button>
+                    </div>
+                </div>
+
+                <!-- Avatar Selection Container -->
+                <div id="avatar-selection-container" class="flex flex-col gap-4 hidden">
+                    <h2 class="font-bold text-md text-center bg-gray-100 py-2 rounded-xl">Choose Avatar</h2>
+                    <div id="player-setup-forms" class="flex flex-col gap-3 max-h-[30vh] overflow-y-auto pr-2 hide-scroll">
+                        <!-- Injected via JS based on player count -->
+                    </div>
+                </div>
+
+                <button id="start-btn" class="w-full bg-pink-500 text-white font-black text-lg py-4 rounded-xl shadow-lg hover:bg-pink-600 transition-colors opacity-50 cursor-not-allowed" disabled>START GAME</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCREEN 2: GAME SCREEN -->
+    <div id="screen-game" class="hidden w-full h-[100dvh] max-w-3xl mx-auto flex-col relative z-20">
+        
+        <!-- Top UI Header (Turn, Leaderboard & Legend) -->
+        <div class="bg-white/95 backdrop-blur-sm p-2 shadow-md shrink-0 flex flex-col gap-2 z-30 relative rounded-b-xl border-b-4 border-black/20">
+            <div class="flex justify-between items-center">
+                <div id="turn-indicator" class="flex items-center gap-2 bg-yellow-100 px-3 py-1.5 rounded-full border border-yellow-400 shadow-sm transition-transform">
+                    <span class="text-xs font-black text-yellow-800">TURN:</span>
+                    <span id="turn-avatar" class="text-xl leading-none drop-shadow"></span>
+                    <span id="turn-name" class="text-sm font-black text-gray-900"></span>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <button id="settings-btn" class="bg-gray-800 hover:bg-gray-700 text-white w-10 h-10 rounded-full shadow-lg transition-transform hover:scale-110 active:scale-95 flex items-center justify-center text-xl">
+                        ⚙️
+                    </button>
+                </div>
+            </div>
+
+            <!-- Horizontal Leaderboard -->
+            <ul id="players-list" class="flex gap-2 overflow-x-auto hide-scroll pb-1">
+                <!-- Injected via JS -->
+            </ul>
+        </div>
+
+        <!-- Board Area (Scales dynamically to fit space) -->
+        <div class="flex-1 min-h-0 w-full p-2 sm:p-4 flex items-center justify-center overflow-hidden relative">
+            <div id="board-container" class="relative board-constraint board-bg-custom shadow-board rounded-xl border-[6px] sm:border-[10px] border-black/80 shrink-0">
+                <!-- Central illustration -->
+                <div class="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
+                     <svg width="60%" height="60%" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M50 20 C20 20, 10 50, 10 70 C10 80, 20 90, 50 90 C80 90, 90 80, 90 70 C90 50, 80 20, 50 20 Z" fill="#ffb6c1"/>
+                        <circle cx="25" cy="50" r="8" fill="#ffd700"/>
+                        <circle cx="75" cy="50" r="8" fill="#ffd700"/>
+                        <path d="M25 50 Q 50 30 75 50" stroke="#ff69b4" stroke-width="4" fill="none"/>
+                        <path d="M50 40 L50 90" stroke="#ff69b4" stroke-width="4"/>
+                    </svg>
+                </div>
+
+                <!-- SVG Overlay for Ladders and Slides -->
+                <svg id="connections-svg" class="absolute inset-0 w-full h-full pointer-events-none z-10"></svg>
+
+                <!-- Grid for the path (56 tiles) -->
+                <div id="board-grid" class="relative w-full h-full grid grid-cols-7 grid-rows-8 p-1 gap-1 z-0">
+                    <!-- Cells generated via JS -->
+                </div>
+
+                <!-- Player Tokens Container -->
+                <div id="tokens-container" class="absolute inset-0 pointer-events-none z-20">
+                    <!-- Tokens injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom UI Footer (Dice) -->
+        <div class="bg-white/95 backdrop-blur-sm p-3 pb-6 sm:pb-3 shadow-[0_-5px_15px_rgba(0,0,0,0.2)] shrink-0 z-30 flex justify-center rounded-t-xl border-t-4 border-black/20">
+            <button id="dice-btn" class="w-full max-w-sm bg-yellow-400 text-yellow-900 font-black text-xl py-2 rounded-2xl shadow-[0_6px_0_0_#b45309] hover:mt-1 hover:mb-[-1px] hover:shadow-[0_5px_0_0_#b45309] active:mt-[6px] active:mb-[-6px] active:shadow-none transition-all flex justify-center items-center gap-2 border-2 border-yellow-600">
+                <div class="dice-scene" id="dice-scene">
+                    <div id="dice-cube" class="dice-cube">
+                        <div class="dice-face dice-front"><div class="w-full h-full flex items-center justify-center"><span class="dot"></span></div></div>
+                        <div class="dice-face dice-back">
+                            <div class="dice-col"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+                            <div class="dice-col"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+                        </div>
+                        <div class="dice-face dice-right">
+                            <span class="dot self-start"></span><span class="dot self-center"></span><span class="dot self-end"></span>
+                        </div>
+                        <div class="dice-face dice-left">
+                            <div class="dice-col"><span class="dot"></span><span class="dot"></span></div>
+                            <div class="dice-col"><span class="dot"></span><span class="dot"></span></div>
+                        </div>
+                        <div class="dice-face dice-top">
+                            <span class="dot self-start"></span><span class="dot self-end"></span>
+                        </div>
+                        <div class="dice-face dice-bottom">
+                            <div class="dice-col"><span class="dot"></span><span class="dot"></span></div>
+                            <div class="dice-col justify-center"><span class="dot"></span></div>
+                            <div class="dice-col"><span class="dot"></span><span class="dot"></span></div>
+                        </div>
+                    </div>
+                </div>
+                <span id="dice-text" class="tracking-wider text-2xl">ROLL DICE</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal Backdrop -->
+    <div id="modal-backdrop" class="fixed inset-0 bg-black/60 z-[70] hidden flex items-center justify-center backdrop-blur-sm p-4">
+        <div id="modal-card" class="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl transform scale-90 opacity-0 transition-all duration-300 relative border-4">
+            
+            <div id="modal-icon" class="absolute -top-8 left-1/2 -translate-x-1/2 w-16 h-16 rounded-full flex items-center justify-center text-3xl shadow-lg border-4 border-white">
+                <!-- Icon injected -->
+            </div>
+
+            <h3 id="modal-title" class="text-xl md:text-2xl font-black text-center mt-6 mb-2">Title</h3>
+            <p id="modal-desc" class="text-gray-600 text-center font-semibold text-sm md:text-base mb-4">Description goes here.</p>
+            
+            <div id="modal-fact-container" class="bg-gray-50 rounded-xl p-3 mb-6 text-xs md:text-sm font-bold text-gray-700 flex flex-col gap-2 shadow-inner">
+                <span id="modal-rule-badge" class="px-2 py-1 rounded text-[10px] md:text-xs text-white self-start">TYPE</span>
+                <span id="modal-fact">Fact or myth text.</span>
+            </div>
+
+            <button id="modal-close-btn" class="w-full bg-gray-800 text-white font-bold py-3 rounded-xl shadow hover:bg-gray-900 transition-colors">GOT IT!</button>
+        </div>
+    </div>
+
+    <!-- Settings Menu Backdrop -->
+    <div id="settings-backdrop" class="fixed inset-0 bg-black/80 z-[60] hidden flex items-center justify-center backdrop-blur-sm p-4">
+        <div class="bg-white rounded-3xl p-4 md:p-6 max-w-md w-full shadow-2xl relative text-gray-800 flex flex-col max-h-[90vh]">
+            <h2 class="text-2xl font-black text-center mb-4 text-pink-600 drop-shadow-sm">GAME MENU</h2>
+            
+            <div class="flex justify-around border-b-2 border-gray-200 mb-4 shrink-0">
+                <button class="tab-btn active pb-2 px-2 text-sm text-gray-500 font-bold transition-colors" data-target="tab-rules">Rules</button>
+                <button class="tab-btn pb-2 px-2 text-sm text-gray-500 font-bold transition-colors" data-target="tab-audio">Audio / Theme</button>
+                <button class="tab-btn pb-2 px-2 text-sm text-gray-500 font-bold transition-colors" data-target="tab-about">About</button>
+            </div>
+
+            <div class="overflow-y-auto hide-scroll flex-1 p-1">
+                <!-- Rules Tab -->
+                <div id="tab-rules" class="tab-content active space-y-4">
+                    <div class="bg-blue-50 p-3 rounded-xl text-sm shadow-inner">
+                        <h4 class="font-black text-blue-800 mb-1">Goal</h4>
+                        <p class="text-blue-900 font-semibold">Roll the dice and navigate the 56-day journey. First to Tile 56 wins!</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-[10px] sm:text-xs font-black text-center">
+                        <div class="bg-gray-100 p-2 rounded-lg border-2 shadow-sm" style="border-color: var(--phase1); color: var(--phase1)"><span class="text-lg">🩸</span><br>Menstrual (1-5)</div>
+                        <div class="bg-gray-100 p-2 rounded-lg border-2 shadow-sm" style="border-color: var(--phase2); color: var(--phase2)"><span class="text-lg">🌿</span><br>Follicular (6-13)</div>
+                        <div class="bg-gray-100 p-2 rounded-lg border-2 shadow-sm" style="border-color: var(--phase3); color: var(--phase3)"><span class="text-lg">☀️</span><br>Ovulation (14-16)</div>
+                        <div class="bg-gray-100 p-2 rounded-lg border-2 shadow-sm" style="border-color: var(--phase4); color: var(--phase4)"><span class="text-lg">☁️</span><br>Luteal (17-28)</div>
+                    </div>
+                    <div class="flex gap-3 items-center bg-green-50 p-3 rounded-xl text-sm shadow-inner">
+                        <span class="text-3xl drop-shadow">🪜</span> <p class="text-green-900 leading-tight"><b>Ladders:</b> Healthy habits boost you forward!</p>
+                    </div>
+                    <div class="flex gap-3 items-center bg-red-50 p-3 rounded-xl text-sm shadow-inner">
+                        <span class="text-3xl drop-shadow">🐍</span> <p class="text-red-900 leading-tight"><b>Snakes:</b> Myths and missteps slide you back.</p>
+                    </div>
+                </div>
+
+                <!-- Audio & Theme Tab -->
+                <div id="tab-audio" class="tab-content space-y-6">
+                    <div class="space-y-3">
+                        <h4 class="font-black text-gray-800 border-b pb-1">Sound Settings</h4>
+                        <label class="flex items-center justify-between bg-gray-50 p-3 rounded-xl font-bold cursor-pointer hover:bg-gray-100 border shadow-sm">
+                            <span class="text-lg">🎵 Music</span>
+                            <input type="checkbox" id="toggle-music" checked class="w-6 h-6 accent-pink-500">
+                        </label>
+                        <label class="flex items-center justify-between bg-gray-50 p-3 rounded-xl font-bold cursor-pointer hover:bg-gray-100 border shadow-sm">
+                            <span class="text-lg">🔊 Sound Effects</span>
+                            <input type="checkbox" id="toggle-sfx" checked class="w-6 h-6 accent-pink-500">
+                        </label>
+                    </div>
+                    <div class="space-y-3">
+                        <h4 class="font-black text-gray-800 border-b pb-1">Visual Theme</h4>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button class="theme-btn bg-[#78350f] text-white py-3 rounded-xl font-black border-4 border-pink-500 shadow" data-theme="default">DEEP</button>
+                            <button class="theme-btn bg-[#171717] text-[#db2777] py-3 rounded-xl font-black border-4 border-transparent shadow" data-theme="neon">NEON</button>
+                            <button class="theme-btn bg-[#d4a373] text-white py-3 rounded-xl font-black border-4 border-transparent shadow" data-theme="pastel">PASTEL</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- About Tab -->
+                <div id="tab-about" class="tab-content text-center space-y-4 px-2">
+                    <div class="bg-pink-50 p-4 rounded-2xl border-2 border-pink-200">
+                        <h3 class="text-xl font-black text-pink-600 mb-2 drop-shadow-sm">CYCLE QUEST</h3>
+                        <p class="text-sm text-pink-900 font-semibold mb-2">An interactive journey designed to teach the phases of the menstrual cycle in a fun, positive, and engaging way.</p>
+                        <p class="text-xs text-pink-700 italic">By understanding your body's rhythm, you can optimize your habits for a healthier lifestyle!</p>
+                    </div>
+                    <p class="text-[10px] text-gray-400 font-bold tracking-widest mt-4">VERSION 2.0</p>
+                </div>
+            </div>
+
+            <div class="mt-4 pt-4 border-t-2 border-gray-200 space-y-3 shrink-0">
+                <button id="restart-game-btn" class="w-full bg-red-50 text-red-600 font-black py-3 rounded-xl hover:bg-red-100 transition-colors border-2 border-red-200 shadow-sm flex items-center justify-center gap-2">
+                    <span class="text-xl">🔄</span> RESTART GAME
+                </button>
+                <button id="close-settings-btn" class="w-full bg-gray-800 text-white font-black py-3 rounded-xl shadow-lg hover:bg-gray-900 transition-colors">RESUME</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- AUDIO SYNTHESIS (Web Audio API) ---
+        let audioCtx;
+        const appSettings = { music: true, sfx: true, theme: 'default' };
+        let bgmInterval;
+        let isBgmPlaying = false;
+        let noiseBuffer;
+
+        function initAudioContext() {
+            if(!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Pre-generate noise buffer for realistic dice sounds
+                const bufferSize = audioCtx.sampleRate * 0.2; // 200ms of noise
+                noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1; // White noise
+                }
+            }
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playTone(frequency, type, duration, vol=0.1) {
+            if(!audioCtx || !appSettings.sfx) return;
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            oscillator.type = type;
+            oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+            
+            gainNode.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + duration);
+        }
+
+        // Beautiful, generative ambient music (Pentatonic scale)
+        function startBGM() {
+            if(isBgmPlaying || !appSettings.music) return;
+            isBgmPlaying = true;
+            const pentatonicScale = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25]; 
+            
+            bgmInterval = setInterval(() => {
+                if(!appSettings.music || !audioCtx) return;
+                const freq = pentatonicScale[Math.floor(Math.random() * pentatonicScale.length)];
+                
+                const osc1 = audioCtx.createOscillator();
+                const osc2 = audioCtx.createOscillator(); // Detuned oscillator for a lush, rich sound
+                const gain = audioCtx.createGain();
+                
+                osc1.type = 'triangle';
+                osc2.type = 'sine';
+                
+                const t = audioCtx.currentTime;
+                osc1.frequency.setValueAtTime(freq, t);
+                osc2.frequency.setValueAtTime(freq * 1.005, t); // Slight detune
+                
+                // Slow ambient envelope: fade in, fade out
+                gain.gain.setValueAtTime(0, t); 
+                gain.gain.linearRampToValueAtTime(0.03, t + 1.2); 
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 4.0);
+                
+                osc1.connect(gain);
+                osc2.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc1.start(t); osc1.stop(t + 4.0);
+                osc2.start(t); osc2.stop(t + 4.0);
+            }, 1200); // Overlapping notes
+        }
+
+        function stopBGM() {
+            clearInterval(bgmInterval);
+            isBgmPlaying = false;
+        }
+
+        const SOUNDS = {
+            // Modern, satisfying UI Pop
+            ui: () => {
+                if(!appSettings.sfx || !audioCtx) return;
+                const t = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, t);
+                osc.frequency.exponentialRampToValueAtTime(200, t + 0.1); // Pitch drop
+                gain.gain.setValueAtTime(0.2, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(t); osc.stop(t + 0.1);
+            },
+            // Realistic Wooden Dice Clatter (Filtered Noise)
+            roll: () => {
+                if(!appSettings.sfx || !audioCtx || !noiseBuffer) return;
+                let time = audioCtx.currentTime;
+                const clatterCount = 6;
+                
+                for(let i=0; i<clatterCount; i++) {
+                    const delay = i * 0.08 + (Math.random() * 0.03); // Random timing bounce
+                    
+                    const noiseSrc = audioCtx.createBufferSource();
+                    noiseSrc.buffer = noiseBuffer;
+                    
+                    const filter = audioCtx.createBiquadFilter();
+                    filter.type = 'bandpass';
+                    filter.frequency.value = 800 + Math.random() * 1000; // 'Woody' frequencies
+                    filter.Q.value = 2; // Sharp resonance for a 'clack'
+                    
+                    const gain = audioCtx.createGain();
+                    gain.gain.setValueAtTime(0.8, time + delay); 
+                    gain.gain.exponentialRampToValueAtTime(0.01, time + delay + 0.05); // Short impact
+                    
+                    noiseSrc.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    
+                    noiseSrc.start(time + delay);
+                    noiseSrc.stop(time + delay + 0.1);
+                }
+            },
+            // Soft xylophone step
+            step: () => {
+                if(!appSettings.sfx || !audioCtx) return;
+                const t = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, t);
+                gain.gain.setValueAtTime(0.1, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(t); osc.stop(t + 0.1);
+            },
+            ladder: () => {
+                setTimeout(() => playTone(440, 'triangle', 0.2, 0.1), 0);
+                setTimeout(() => playTone(554, 'triangle', 0.2, 0.1), 100);
+                setTimeout(() => playTone(659, 'triangle', 0.3, 0.1), 200);
+                setTimeout(() => playTone(880, 'triangle', 0.5, 0.1), 300);
+            },
+            slide: () => {
+                if(!appSettings.sfx || !audioCtx) return;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.7);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.7);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.7);
+            },
+            win: () => {
+                const notes = [523.25, 523.25, 523.25, 659.25, 783.99, 1046.50];
+                const times = [0, 0.15, 0.3, 0.45, 0.75, 1.2];
+                notes.forEach((freq, i) => setTimeout(() => playTone(freq, 'square', 0.4, 0.1), times[i] * 1000));
+            }
+        };
+
+        // --- GAME STATE ---
+        const TOTAL_STEPS = 56;
+        const GRID_COLS = 7;
+        const GRID_ROWS = 8;
+        const AVAILABLE_AVATARS = ['💧', '🍫', '🌡️', '🌸', '🏃‍♀️', '🧘‍♀️', '🍎', '🍵'];
+
+        const GAME_STATE = {
+            players: [], // { id, name, avatar, position }
+            currentPlayerIndex: 0,
+            isRolling: false,
+            isMoving: false,
+            gameStarted: false,
+            playerCount: 1
+        };
+
+        // --- BOARD CONFIGURATION ---
+        // Cycle is 28 days. Modulo arithmetic applies.
+        function getPhaseClass(cellNum) {
+            let dayInCycle = ((cellNum - 1) % 28) + 1;
+            if (dayInCycle >= 1 && dayInCycle <= 5) return 'phase1-bg';
+            if (dayInCycle >= 6 && dayInCycle <= 13) return 'phase2-bg';
+            if (dayInCycle >= 14 && dayInCycle <= 16) return 'phase3-bg';
+            return 'phase4-bg'; // 17-28
+        }
+
+        // Expanded interactions for 56 tiles (Cycle 1 & Cycle 2)
+        const interactions = {
+            // Cycle 1 - Ladders
+            3: { type: 'ladder', to: 7, title: 'Heating Pad', desc: 'Move ahead to Cramp Relief!', fact: 'Heat helps relax uterine muscles and ease cramps.', badge: 'FACT', badgeColor: 'bg-green-500', icon: '✅', iconBg: 'bg-green-100' },
+            10: { type: 'ladder', to: 15, title: 'Iron-Rich Food', desc: 'Move ahead to Replenish Energy!', fact: 'Iron helps replenish what’s lost. Spinach is great!', badge: 'FACT', badgeColor: 'bg-green-500', icon: '✅', iconBg: 'bg-green-100' },
+            22: { type: 'ladder', to: 26, title: 'Prioritize Sleep', desc: 'Move ahead to Mood Boost!', fact: 'Good sleep during luteal phase regulates mood swings.', badge: 'FACT', badgeColor: 'bg-green-500', icon: '✅', iconBg: 'bg-green-100' },
+            
+            // Cycle 1 - Slides
+            8: { type: 'slide', to: 4, title: 'Forgot Pad Change', desc: 'Slide back to Hygiene Check.', fact: 'Change pad/tampon every 4-6 hours to stay fresh.', badge: 'MISSTEP', badgeColor: 'bg-orange-500', icon: '⚠️', iconBg: 'bg-orange-100' },
+            19: { type: 'slide', to: 12, title: 'Myth: Can\'t Swim', desc: 'Slide back to Correction Card.', fact: 'Yes, you can swim! Just use a tampon or menstrual cup.', badge: 'MYTH BUSTER', badgeColor: 'bg-red-500', icon: '❌', iconBg: 'bg-red-100' },
+            25: { type: 'slide', to: 21, title: 'Caffeine Overload', desc: 'Slide back to PMS Tension.', fact: 'Too much caffeine can worsen cramps and tenderness.', badge: 'MISSTEP', badgeColor: 'bg-orange-500', icon: '⚠️', iconBg: 'bg-orange-100' },
+
+            // Cycle 2 - Ladders (Tougher/Better)
+            31: { type: 'ladder', to: 38, title: 'Yoga Session', desc: 'Stretch ahead to Better Blood Flow!', fact: 'Gentle exercise like yoga can significantly reduce menstrual pain.', badge: 'HABIT', badgeColor: 'bg-green-500', icon: '🧘‍♀️', iconBg: 'bg-green-100' },
+            40: { type: 'ladder', to: 46, title: 'Hydration Goal', desc: 'Flow ahead to Clear Skin!', fact: 'Staying hydrated helps reduce bloating during the follicular and ovulation phases.', badge: 'FACT', badgeColor: 'bg-green-500', icon: '💧', iconBg: 'bg-green-100' },
+            49: { type: 'ladder', to: 54, title: 'Mindfulness', desc: 'Jump to Calm Luteal!', fact: 'Meditation can manage PMS symptoms like anxiety and irritability.', badge: 'WELLNESS', badgeColor: 'bg-green-500', icon: '🧠', iconBg: 'bg-green-100' },
+
+            // Cycle 2 - Slides
+            36: { type: 'slide', to: 29, title: 'Skipped Meals', desc: 'Energy crash! Slide back.', fact: 'Skipping meals causes blood sugar drops, worsening mood swings.', badge: 'MISSTEP', badgeColor: 'bg-orange-500', icon: '📉', iconBg: 'bg-orange-100' },
+            44: { type: 'slide', to: 39, title: 'Stress Spike', desc: 'Ovulation delayed. Slide down.', fact: 'High stress levels can interfere with ovulation timing.', badge: 'FACT', badgeColor: 'bg-orange-500', icon: '⚡', iconBg: 'bg-orange-100' },
+            52: { type: 'slide', to: 47, title: 'Salty Snacks Binge', desc: 'Bloating alert! Slide back.', fact: 'Excess sodium during the luteal phase increases water retention.', badge: 'MISSTEP', badgeColor: 'bg-orange-500', icon: '🍟', iconBg: 'bg-orange-100' }
+        };
+
+        // --- DOM ELEMENTS ---
+        const boardGrid = document.getElementById('board-grid');
+        const connectionsSvg = document.getElementById('connections-svg');
+        const tokensContainer = document.getElementById('tokens-container');
+        
+        // Setup UI
+        const setupScreen = document.getElementById('screen-setup');
+        const gameScreen = document.getElementById('screen-game');
+        const playerCountBtns = document.querySelectorAll('.player-count-btn');
+        const avatarSelectionContainer = document.getElementById('avatar-selection-container');
+        const playerSetupForms = document.getElementById('player-setup-forms');
+        const startBtn = document.getElementById('start-btn');
+        
+        // Game UI
+        const turnAvatar = document.getElementById('turn-avatar');
+        const turnName = document.getElementById('turn-name');
+        const turnIndicator = document.getElementById('turn-indicator');
+        const playersListUI = document.getElementById('players-list');
+        const diceBtn = document.getElementById('dice-btn');
+        const diceValue = document.getElementById('dice-value');
+        
+        // Modal
+        const modalBackdrop = document.getElementById('modal-backdrop');
+        const modalCard = document.getElementById('modal-card');
+        const modalIcon = document.getElementById('modal-icon');
+        const modalTitle = document.getElementById('modal-title');
+        const modalDesc = document.getElementById('modal-desc');
+        const modalRuleBadge = document.getElementById('modal-rule-badge');
+        const modalFact = document.getElementById('modal-fact');
+        const modalFactContainer = document.getElementById('modal-fact-container');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+
+        // --- STREAMING_CHUNK:Rendering the Board Grid ---
+        function getCellPos(cellNum) {
+            // Boustrophedon pattern for 8 rows, 7 cols
+            // Top row is Row 0 (tiles 50-56 or 56-50 depending on direction)
+            // Bottom row is Row 7 (tiles 1-7)
+            const rowIdx = Math.floor((cellNum - 1) / GRID_COLS); // 0 for 1-7, 7 for 50-56
+            const row = GRID_ROWS - 1 - rowIdx; 
+            
+            // Alternating direction
+            const isLeftToRight = (rowIdx % 2 === 0);
+            const col = isLeftToRight ? ((cellNum - 1) % GRID_COLS) : (GRID_COLS - 1 - ((cellNum - 1) % GRID_COLS));
+            
+            return { row, col };
+        }
+
+        function renderBoard() {
+            boardGrid.innerHTML = '';
+            const gridMap = Array.from({ length: GRID_ROWS }, () => Array(GRID_COLS).fill(null));
+
+            for (let i = 1; i <= TOTAL_STEPS; i++) {
+                const pos = getCellPos(i);
+                gridMap[pos.row][pos.col] = i;
+            }
+
+            for (let r = 0; r < GRID_ROWS; r++) {
+                for (let c = 0; c < GRID_COLS; c++) {
+                    const cellNum = gridMap[r][c];
+                    const cell = document.createElement('div');
+                    cell.className = `cell relative flex flex-col items-center justify-center rounded-lg sm:rounded-xl border border-white/50 shadow-sm ${getPhaseClass(cellNum)}`;
+                    cell.id = `cell-${cellNum}`;
+
+                    // Tile Number
+                    const numSpan = document.createElement('span');
+                    numSpan.className = 'absolute top-0.5 left-1 font-black text-white/70 text-sm sm:text-lg drop-shadow-sm';
+                    numSpan.innerText = cellNum;
+                    cell.appendChild(numSpan);
+
+                    // Month markers
+                    if (cellNum === 1) addLabel(cell, 'MONTH 1 START');
+                    if (cellNum === 28) addLabel(cell, 'END M1');
+                    if (cellNum === 29) addLabel(cell, 'MONTH 2 START');
+                    if (cellNum === 56) addLabel(cell, 'QUEST COMPLETE');
+
+                    // Interaction Labels
+                    if (interactions[cellNum]) {
+                        const label = document.createElement('span');
+                        label.className = 'mt-3 sm:mt-4 text-center text-[7px] sm:text-[9px] font-bold leading-tight px-1 bg-white/70 rounded text-gray-800 drop-shadow-sm pointer-events-none z-10';
+                        label.innerText = interactions[cellNum].title;
+                        cell.appendChild(label);
+                    }
+
+                    // End points labels softly
+                    Object.values(interactions).forEach(inter => {
+                        if (inter.to === cellNum) {
+                            const label = document.createElement('span');
+                            label.className = 'absolute bottom-0.5 right-1 text-[6px] sm:text-[8px] font-bold text-white/80';
+                            label.innerText = inter.type === 'ladder' ? "Ladder End" : "Slide End";
+                            cell.appendChild(label);
+                        }
+                    });
+
+                    boardGrid.appendChild(cell);
+                }
+            }
+            setTimeout(drawConnections, 100);
+        }
+
+        function addLabel(cell, text) {
+            const span = document.createElement('span');
+            span.className = 'font-bold text-white uppercase text-[6px] sm:text-[9px] drop-shadow bg-black/20 px-1 py-0.5 rounded-full text-center leading-tight mt-1';
+            span.innerHTML = text.replace(' ', '<br>');
+            cell.appendChild(span);
+        }
+
+        // --- STREAMING_CHUNK:Drawing Snakes (Slides) and Ladders via SVG ---
+        function drawConnections() {
+            connectionsSvg.innerHTML = ''; 
+            const boardRect = boardGrid.getBoundingClientRect();
+
+            for (const [startNum, inter] of Object.entries(interactions)) {
+                const startCell = document.getElementById(`cell-${startNum}`);
+                const endCell = document.getElementById(`cell-${inter.to}`);
+                if (!startCell || !endCell) continue;
+
+                const startRect = startCell.getBoundingClientRect();
+                const endRect = endCell.getBoundingClientRect();
+
+                const startX = startRect.left - boardRect.left + startRect.width / 2;
+                const startY = startRect.top - boardRect.top + startRect.height / 2;
+                const endX = endRect.left - boardRect.left + endRect.width / 2;
+                const endY = endRect.top - boardRect.top + endRect.height / 2;
+
+                if (inter.type === 'ladder') {
+                    // Realistic Ladder drawing - Thinner and cleaner
+                    const angle = Math.atan2(endY - startY, endX - startX);
+                    const length = Math.hypot(endX - startX, endY - startY);
+                    const nx = -Math.sin(angle);
+                    const ny = Math.cos(angle);
+                    const width = 5; // Reduced width for better visuals
+                    const railColor = "#78350f"; // Darker wood
+                    
+                    // Left rail
+                    const l1 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                    l1.setAttribute("x1", startX + nx * width); l1.setAttribute("y1", startY + ny * width);
+                    l1.setAttribute("x2", endX + nx * width); l1.setAttribute("y2", endY + ny * width);
+                    l1.setAttribute("stroke", railColor); l1.setAttribute("stroke-width", "4"); l1.setAttribute("stroke-linecap", "round");
+                    
+                    // Right rail
+                    const l2 = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                    l2.setAttribute("x1", startX - nx * width); l2.setAttribute("y1", startY - ny * width);
+                    l2.setAttribute("x2", endX - nx * width); l2.setAttribute("y2", endY - ny * width);
+                    l2.setAttribute("stroke", railColor); l2.setAttribute("stroke-width", "4"); l2.setAttribute("stroke-linecap", "round");
+                    
+                    connectionsSvg.appendChild(l1);
+                    connectionsSvg.appendChild(l2);
+                    
+                    // Rungs
+                    const numRungs = Math.max(3, Math.floor(length / 15));
+                    for(let i=1; i<numRungs; i++) {
+                        const t = i / numRungs;
+                        const rx = startX + (endX - startX) * t;
+                        const ry = startY + (endY - startY) * t;
+                        const rung = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                        rung.setAttribute("x1", rx + nx * width); rung.setAttribute("y1", ry + ny * width);
+                        rung.setAttribute("x2", rx - nx * width); rung.setAttribute("y2", ry - ny * width);
+                        rung.setAttribute("stroke", "#92400e"); rung.setAttribute("stroke-width", "3");
+                        connectionsSvg.appendChild(rung);
+                    }
+                } else {
+                    // Stylized, better-looking snake
+                    const offset = (startX > endX) ? 35 : -35;
+                    const midX = (startX + endX) / 2 + offset;
+                    const midY = (startY + endY) / 2;
+                    const pathStr = `M ${startX} ${startY} Q ${midX} ${midY} ${endX} ${endY}`;
+                    
+                    // Outer Body (Thick Outline)
+                    const body = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    body.setAttribute("d", pathStr);
+                    body.setAttribute("stroke", "#b91c1c"); // Deep Red
+                    body.setAttribute("stroke-width", "12");
+                    body.setAttribute("fill", "none");
+                    body.setAttribute("stroke-linecap", "round");
+                    
+                    // Inner Pattern (Sleek line)
+                    const pattern = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    pattern.setAttribute("d", pathStr);
+                    pattern.setAttribute("stroke", "#f87171"); // Lighter Red
+                    pattern.setAttribute("stroke-width", "4");
+                    pattern.setAttribute("stroke-dasharray", "4 6");
+                    pattern.setAttribute("fill", "none");
+                    pattern.setAttribute("stroke-linecap", "round");
+                    
+                    connectionsSvg.appendChild(body);
+                    connectionsSvg.appendChild(pattern);
+
+                    // Snake Head
+                    const head = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    head.setAttribute("cx", startX); head.setAttribute("cy", startY);
+                    head.setAttribute("r", "8"); head.setAttribute("fill", "#b91c1c");
+                    connectionsSvg.appendChild(head);
+                    
+                    // Snake Eyes
+                    const eye1 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    eye1.setAttribute("cx", startX - 3); eye1.setAttribute("cy", startY - 2);
+                    eye1.setAttribute("r", "2"); eye1.setAttribute("fill", "white");
+                    
+                    const eye2 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    eye2.setAttribute("cx", startX + 3); eye2.setAttribute("cy", startY - 2);
+                    eye2.setAttribute("r", "2"); eye2.setAttribute("fill", "white");
+                    
+                    connectionsSvg.appendChild(eye1);
+                    connectionsSvg.appendChild(eye2);
+                }
+            }
+            updateTokenPositions(true); // Re-align tokens if window resizes
+        }
+
+        // --- STREAMING_CHUNK:Multiplayer Setup Logic ---
+        playerCountBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                initAudioContext();
+                SOUNDS.ui();
+                playerCountBtns.forEach(b => {
+                    b.classList.remove('border-pink-500', 'bg-pink-100');
+                    b.classList.add('border-transparent');
+                });
+                const target = e.currentTarget;
+                target.classList.remove('border-transparent');
+                target.classList.add('border-pink-500', 'bg-pink-100');
+                
+                GAME_STATE.playerCount = parseInt(target.dataset.count);
+                generatePlayerSetupForms(GAME_STATE.playerCount);
+                checkSetupValidity();
+            });
+        });
+
+        function generatePlayerSetupForms(count) {
+            avatarSelectionContainer.classList.remove('hidden');
+            playerSetupForms.innerHTML = '';
+            
+            for(let i=0; i<count; i++) {
+                const row = document.createElement('div');
+                row.className = 'flex flex-col sm:flex-row gap-2 items-center bg-gray-50 p-2 rounded-lg border border-gray-200';
+                
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.placeholder = `Player ${i+1} Name`;
+                input.value = `Player ${i+1}`;
+                input.className = 'player-name-input text-sm border rounded px-2 py-1 w-full sm:w-1/2 focus:outline-pink-500';
+                input.dataset.idx = i;
+                
+                const avatarSelect = document.createElement('div');
+                avatarSelect.className = 'flex gap-1 overflow-x-auto hide-scroll w-full justify-start sm:justify-center';
+                
+                AVAILABLE_AVATARS.forEach(avatar => {
+                    const btn = document.createElement('button');
+                    btn.className = `avatar-btn text-xl p-1 rounded hover:bg-pink-100 border-2 border-transparent transition-colors`;
+                    btn.innerText = avatar;
+                    btn.dataset.idx = i;
+                    btn.dataset.avatar = avatar;
+                    
+                    // Default selection
+                    if (AVAILABLE_AVATARS.indexOf(avatar) === i) {
+                        btn.classList.add('border-pink-500', 'bg-pink-50', 'selected-avatar');
+                    }
+                    
+                    btn.onclick = (e) => selectAvatar(i, avatar, e.currentTarget);
+                    avatarSelect.appendChild(btn);
+                });
+
+                row.appendChild(input);
+                row.appendChild(avatarSelect);
+                playerSetupForms.appendChild(row);
+                
+                // Add event listener to input to re-check validity
+                input.addEventListener('input', checkSetupValidity);
+            }
+            checkSetupValidity();
+        }
+
+        function selectAvatar(playerIdx, avatar, btnElement) {
+            initAudioContext();
+            SOUNDS.ui();
+            const container = btnElement.parentElement;
+            const buttons = container.querySelectorAll('.avatar-btn');
+            buttons.forEach(b => b.classList.remove('selected-avatar'));
+            btnElement.classList.add('selected-avatar');
+            checkSetupValidity();
+        }
+
+        function checkSetupValidity() {
+            let valid = true;
+            const names = document.querySelectorAll('.player-name-input');
+            const avatars = document.querySelectorAll('.selected-avatar');
+            
+            if (names.length !== GAME_STATE.playerCount || avatars.length !== GAME_STATE.playerCount) {
+                valid = false;
+            }
+
+            names.forEach(n => { if(n.value.trim() === '') valid = false; });
+            
+            // Check for duplicate avatars (optional rule, enforcing here)
+            const chosenAvatars = Array.from(avatars).map(a => a.dataset.avatar);
+            const uniqueAvatars = new Set(chosenAvatars);
+            if (uniqueAvatars.size !== chosenAvatars.length) {
+                valid = false; // Prevent same avatar selection
+            }
+
+            if (valid) {
+                startBtn.disabled = false;
+                startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                startBtn.innerText = 'START GAME';
+            } else {
+                startBtn.disabled = true;
+                startBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                startBtn.innerText = 'SELECT UNIQUE AVATAR';
+            }
+        }
+
+        startBtn.addEventListener('click', () => {
+            initAudioContext();
+            startBGM();
+            
+            // Initialize players
+            GAME_STATE.players = [];
+            tokensContainer.innerHTML = '';
+
+            const nameInputs = document.querySelectorAll('.player-name-input');
+            const avatarBtns = document.querySelectorAll('.selected-avatar');
+
+            for (let i = 0; i < GAME_STATE.playerCount; i++) {
+                GAME_STATE.players.push({
+                    id: i,
+                    name: nameInputs[i].value.trim(),
+                    avatar: avatarBtns[i].dataset.avatar,
+                    position: 1
+                });
+                
+                // Create Token DOM
+                const token = document.createElement('div');
+                token.id = `token-p${i}`;
+                token.className = 'player-token w-7 h-7 sm:w-9 sm:h-9 bg-white rounded-full flex items-center justify-center text-sm sm:text-lg shadow-token border-[3px] border-gray-900 overflow-hidden';
+                token.innerText = avatarBtns[i].dataset.avatar;
+                tokensContainer.appendChild(token);
+            }
+
+            GAME_STATE.currentPlayerIndex = 0;
+            GAME_STATE.gameStarted = true;
+            
+            setupScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+            gameScreen.classList.add('flex');
+            
+            updateUIForCurrentPlayer();
+            
+            // Allow DOM to render game screen dimensions before drawing SVGs and placing tokens
+            setTimeout(() => {
+                drawConnections();
+                updateTokenPositions(true);
+            }, 50);
+
+            updateLeaderboard();
+        });
+
+
+        // --- SETTINGS & MENU LOGIC ---
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsBackdrop = document.getElementById('settings-backdrop');
+        const closeSettingsBtn = document.getElementById('close-settings-btn');
+        const restartGameBtn = document.getElementById('restart-game-btn');
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        const toggleMusic = document.getElementById('toggle-music');
+        const toggleSfx = document.getElementById('toggle-sfx');
+        const themeBtns = document.querySelectorAll('.theme-btn');
+
+        settingsBtn.addEventListener('click', () => {
+            SOUNDS.ui();
+            settingsBackdrop.classList.remove('hidden');
+        });
+        
+        closeSettingsBtn.addEventListener('click', () => {
+            SOUNDS.ui();
+            settingsBackdrop.classList.add('hidden');
+        });
+        
+        restartGameBtn.addEventListener('click', () => {
+            SOUNDS.ui();
+            location.reload(); // Restarts the game
+        });
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                SOUNDS.ui();
+                tabBtns.forEach(b => b.classList.remove('active', 'border-pink-500', 'text-pink-600'));
+                tabContents.forEach(c => c.classList.remove('active'));
+                const target = e.currentTarget;
+                target.classList.add('active', 'border-pink-500', 'text-pink-600');
+                document.getElementById(target.dataset.target).classList.add('active');
+            });
+        });
+
+        toggleMusic.addEventListener('change', (e) => {
+            appSettings.music = e.target.checked;
+            if(appSettings.music) startBGM();
+            else stopBGM();
+        });
+        
+        toggleSfx.addEventListener('change', (e) => {
+            appSettings.sfx = e.target.checked;
+        });
+
+        themeBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                SOUNDS.ui();
+                const theme = e.currentTarget.dataset.theme;
+                appSettings.theme = theme;
+                document.documentElement.setAttribute('data-theme', theme);
+                
+                themeBtns.forEach(b => b.classList.remove('border-pink-500'));
+                e.currentTarget.classList.add('border-pink-500');
+            });
+        });
+
+        // --- STREAMING_CHUNK:Game Loop & Movement Logic ---
+        function updateUIForCurrentPlayer() {
+            const player = GAME_STATE.players[GAME_STATE.currentPlayerIndex];
+            turnAvatar.innerText = player.avatar;
+            turnName.innerText = player.name;
+            
+            // Highlight current player token
+            GAME_STATE.players.forEach(p => {
+                const token = document.getElementById(`token-p${p.id}`);
+                if (p.id === player.id) {
+                    token.classList.add('border-pink-500', 'border-4', 'scale-125');
+                    token.classList.remove('border-gray-800', 'border-2');
+                    token.style.zIndex = '30';
+                } else {
+                    token.classList.remove('border-pink-500', 'border-4', 'scale-125');
+                    token.classList.add('border-gray-800', 'border-2');
+                    token.style.zIndex = '20';
+                }
+            });
+        }
+
+        function updateLeaderboard() {
+            playersListUI.innerHTML = '';
+            // Sort by position descending
+            const sortedPlayers = [...GAME_STATE.players].sort((a, b) => b.position - a.position);
+            
+            sortedPlayers.forEach(p => {
+                const li = document.createElement('li');
+                li.className = `flex flex-col items-center justify-center p-1 sm:p-1.5 rounded-lg min-w-[60px] sm:min-w-[70px] shadow-sm transition-transform ${p.id === GAME_STATE.currentPlayerIndex ? 'bg-yellow-100 border-2 border-yellow-400 scale-105' : 'bg-white border border-gray-200'}`;
+                li.innerHTML = `
+                    <span class="text-xl sm:text-2xl leading-none mb-0.5">${p.avatar}</span>
+                    <span class="text-[9px] sm:text-[11px] truncate w-full text-center font-bold text-gray-700">${p.name}</span>
+                    <span class="text-[9px] sm:text-[10px] bg-gray-100 px-1 rounded-full font-black text-gray-500 w-full text-center mt-0.5 border">T${p.position}</span>
+                `;
+                playersListUI.appendChild(li);
+            });
+        }
+
+        function updateTokenPositions(instant = false) {
+            const boardRect = boardGrid.getBoundingClientRect();
+            
+            // Group players by cell to handle offsets
+            const cellOccupants = {};
+            GAME_STATE.players.forEach(p => {
+                if (!cellOccupants[p.position]) cellOccupants[p.position] = [];
+                cellOccupants[p.position].push(p);
+            });
+
+            GAME_STATE.players.forEach(player => {
+                const token = document.getElementById(`token-p${player.id}`);
+                const cell = document.getElementById(`cell-${player.position}`);
+                if (!cell || !token) return;
+
+                const cellRect = cell.getBoundingClientRect();
+                
+                // Base center position
+                let targetTop = cellRect.top - boardRect.top + (cellRect.height / 2) - (token.offsetHeight / 2);
+                let targetLeft = cellRect.left - boardRect.left + (cellRect.width / 2) - (token.offsetWidth / 2);
+
+                // Offset if multiple players on same cell
+                const occupants = cellOccupants[player.position];
+                if (occupants.length > 1) {
+                    const idx = occupants.findIndex(p => p.id === player.id);
+                    const offsetAmount = 8; // px
+                    // Distribute around center
+                    const angle = (idx / occupants.length) * Math.PI * 2;
+                    targetLeft += Math.cos(angle) * offsetAmount;
+                    targetTop += Math.sin(angle) * offsetAmount;
+                }
+
+                if (instant) {
+                    token.style.transition = 'none';
+                    token.style.top = `${targetTop}px`;
+                    token.style.left = `${targetLeft}px`;
+                    void token.offsetWidth; // force reflow
+                    token.style.transition = 'top 0.5s ease-in-out, left 0.5s ease-in-out, transform 0.2s ease';
+                } else {
+                    token.style.top = `${targetTop}px`;
+                    token.style.left = `${targetLeft}px`;
+                }
+            });
+        }
+
+        const diceCube = document.getElementById('dice-cube');
+        const diceText = document.getElementById('dice-text');
+        const diceScene = document.getElementById('dice-scene');
+        
+        diceBtn.addEventListener('click', rollDice);
+
+        function rollDice() {
+            if (GAME_STATE.isRolling || GAME_STATE.isMoving || !GAME_STATE.gameStarted) return;
+            
+            initAudioContext(); // Ensure audio context is alive
+            
+            GAME_STATE.isRolling = true;
+            diceBtn.classList.add('opacity-80', 'cursor-not-allowed');
+            SOUNDS.roll();
+
+            // Trigger Jumping Animation
+            diceScene.classList.remove('dice-jumping');
+            void diceScene.offsetWidth; // Trigger reflow
+            diceScene.classList.add('dice-jumping');
+
+            let finalValue = Math.floor(Math.random() * 6) + 1;
+            
+            // 3D rotations mapping for 1 to 6
+            const rotations = [
+                { x: 0, y: 0 },       // 1 (Front)
+                { x: -90, y: 0 },     // 2 (Top)
+                { x: 0, y: -90 },     // 3 (Right)
+                { x: 0, y: 90 },      // 4 (Left)
+                { x: 90, y: 0 },      // 5 (Bottom)
+                { x: 0, y: 180 }      // 6 (Back)
+            ];
+            
+            // Add extra spins (720 degrees) for dramatic effect
+            let rotX = rotations[finalValue-1].x + (360 * (Math.floor(Math.random() * 2) + 2));
+            let rotY = rotations[finalValue-1].y + (360 * (Math.floor(Math.random() * 2) + 2));
+            
+            diceCube.style.transform = `translateZ(-30px) rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+            diceText.innerText = 'ROLLING...';
+            
+            setTimeout(() => {
+                finishRoll(finalValue);
+            }, 800); // Wait for jump & roll transition to finish
+        }
+
+        function finishRoll(value) {
+            GAME_STATE.isRolling = false;
+            GAME_STATE.isMoving = true;
+            
+            const player = GAME_STATE.players[GAME_STATE.currentPlayerIndex];
+            let startPos = player.position;
+            let targetPos = startPos + value;
+
+            if (targetPos > TOTAL_STEPS) {
+                // Rule 1: Must roll exact number to win. Cannot move if roll is too high.
+                diceText.innerText = 'TOO HIGH!';
+                setTimeout(() => {
+                    nextTurn();
+                }, 1200);
+                return;
+            }
+
+            diceText.innerText = 'ROLL DICE';
+
+            // Move step-by-step
+            let current = startPos;
+            const stepInterval = setInterval(() => {
+                if (current < targetPos) {
+                    current++;
+                    player.position = current;
+                    SOUNDS.step();
+                    updateTokenPositions();
+                    updateLeaderboard();
+                } else {
+                    clearInterval(stepInterval);
+                    setTimeout(() => checkInteractions(player), 500); // Wait for transiton
+                }
+            }, 400); // Match transiton time
+        }
+
+        function checkInteractions(player) {
+            const cellNum = player.position;
+            
+            if (interactions[cellNum]) {
+                const inter = interactions[cellNum];
+                const isLadder = inter.type === 'ladder'; // Check if they landed on a ladder
+                
+                if (isLadder) SOUNDS.ladder();
+                else SOUNDS.slide();
+
+                showModal(inter, () => {
+                    player.position = inter.to;
+                    updateTokenPositions();
+                    updateLeaderboard();
+                    setTimeout(() => {
+                        checkWinCondition(player, isLadder); // Pass extra turn condition
+                    }, 600);
+                });
+            } else {
+                checkWinCondition(player, false);
+            }
+        }
+
+        function checkWinCondition(player, extraTurn = false) {
+            if (player.position === TOTAL_STEPS) {
+                SOUNDS.win();
+                startConfetti();
+                showModal({
+                    title: 'QUEST COMPLETE!',
+                    desc: `${player.name} has successfully navigated the 2-Month Journey!`,
+                    fact: 'Understanding your cycle gives you the power to optimize your health and routines.',
+                    badge: 'WINNER',
+                    badgeColor: 'bg-pink-500',
+                    icon: '🏆',
+                    iconBg: 'bg-pink-100',
+                    type: 'win'
+                }, () => {
+                    // Update dice button to play again
+                    diceText.innerText = 'PLAY AGAIN';
+                    diceCube.parentElement.classList.add('hidden'); // hide 3d cube
+                    diceBtn.onclick = () => location.reload();
+                    diceBtn.classList.remove('opacity-80', 'cursor-not-allowed');
+                });
+            } else {
+                if (extraTurn) {
+                    // Rule 2: Give an extra turn for climbing a ladder
+                    GAME_STATE.isMoving = false;
+                    diceBtn.classList.remove('opacity-80', 'cursor-not-allowed');
+                    diceText.innerText = 'ROLL AGAIN!';
+                    
+                    // Flash turn indicator to show they still have the turn
+                    turnIndicator.classList.remove('animate-pulse');
+                    void turnIndicator.offsetWidth;
+                    turnIndicator.classList.add('animate-pulse');
+                } else {
+                    nextTurn();
+                }
+            }
+        }
+
+        function nextTurn() {
+            GAME_STATE.isMoving = false;
+            GAME_STATE.currentPlayerIndex = (GAME_STATE.currentPlayerIndex + 1) % GAME_STATE.playerCount;
+            updateUIForCurrentPlayer();
+            diceBtn.classList.remove('opacity-80', 'cursor-not-allowed');
+            diceText.innerText = 'ROLL DICE'; // Reset dice text
+            
+            // Visual cue for turn change
+            turnIndicator.classList.remove('animate-pulse');
+            void turnIndicator.offsetWidth;
+            turnIndicator.classList.add('animate-pulse');
+        }
+
+
+        // --- STREAMING_CHUNK:Modal and Confetti Effects ---
+        function showModal(data, callback) {
+            modalTitle.innerText = data.title;
+            modalDesc.innerText = data.desc;
+            
+            if (data.fact) {
+                modalFactContainer.classList.remove('hidden');
+                modalFact.innerText = data.fact;
+                modalRuleBadge.innerText = data.badge;
+                modalRuleBadge.className = `px-2 py-1 rounded text-[10px] md:text-xs text-white self-start font-black tracking-wide ${data.badgeColor}`;
+            } else {
+                modalFactContainer.classList.add('hidden');
+            }
+            
+            modalIcon.innerText = data.icon;
+            modalIcon.className = `absolute -top-8 left-1/2 -translate-x-1/2 w-16 h-16 rounded-full flex items-center justify-center text-3xl shadow-lg border-4 border-white ${data.iconBg}`;
+
+            if(data.type === 'win'){
+                modalCard.style.borderColor = '#ec4899'; 
+            } else if (data.type === 'ladder') {
+                modalCard.style.borderColor = '#4ade80'; 
+            } else {
+                modalCard.style.borderColor = '#f87171';
+            }
+
+            modalBackdrop.classList.remove('hidden');
+            void modalBackdrop.offsetWidth;
+            modalCard.classList.remove('scale-90', 'opacity-0');
+            modalCard.classList.add('scale-100', 'opacity-100');
+
+            modalCloseBtn.onclick = () => {
+                closeModal();
+                if (callback) callback();
+            };
+        }
+
+        function closeModal() {
+            modalCard.classList.remove('scale-100', 'opacity-100');
+            modalCard.classList.add('scale-90', 'opacity-0');
+            setTimeout(() => {
+                modalBackdrop.classList.add('hidden');
+            }, 300); 
+        }
+
+        // Pure JS Confetti
+        function startConfetti() {
+            const canvas = document.getElementById('confetti-canvas');
+            canvas.classList.remove('hidden');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const particles = [];
+            const colors = ['#ffadad', '#caffbf', '#fdffb6', '#9bf6ff', '#ec4899', '#f59e0b'];
+
+            for (let i = 0; i < 150; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height - canvas.height,
+                    w: Math.random() * 10 + 5,
+                    h: Math.random() * 10 + 5,
+                    vx: Math.random() * 4 - 2,
+                    vy: Math.random() * 3 + 2,
+                    c: colors[Math.floor(Math.random() * colors.length)],
+                    rot: Math.random() * 360,
+                    rotSpeed: Math.random() * 10 - 5
+                });
+            }
+
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.rot += p.rotSpeed;
+                    
+                    if (p.y > canvas.height) {
+                        p.y = -10;
+                        p.x = Math.random() * canvas.width;
+                    }
+
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.rot * Math.PI / 180);
+                    ctx.fillStyle = p.c;
+                    ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+                    ctx.restore();
+                });
+                requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
+        // Handle Resizing
+        window.addEventListener('resize', () => {
+            drawConnections();
+            if (GAME_STATE.gameStarted) {
+                updateTokenPositions(true);
+            }
+            
+            const canvas = document.getElementById('confetti-canvas');
+            if(!canvas.classList.contains('hidden')){
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+        });
+
+        // Initialize Board on Load
+        window.addEventListener('DOMContentLoaded', () => {
+            renderBoard();
+            // Select 1 player by default to trigger forms creation
+            document.querySelector('.player-count-btn[data-count="1"]').click();
+        });
+
+    </script>
+</body>
+</html>

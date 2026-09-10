@@ -16,14 +16,17 @@ const Contactus = () => {
     });
   }, []);
 
-  const handleSubmit = (e) => {
+  const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+  const submitUrl = API_BASE_URL ? `${API_BASE_URL}/api/v1/contact/submit` : '/api/v1/contact/submit';
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setSubmitStatus(null);
 
     // Use formRef.current or fallback to form selector
     const formElement = formRef.current || document.querySelector('#contact-form');
-    
+
     if (!formElement) {
       console.error('Form element not found');
       setSubmitStatus('error');
@@ -31,43 +34,54 @@ const Contactus = () => {
       return;
     }
 
-    console.log('Sending form with EmailJS...');
-    console.log('Form element:', formElement);
-    console.log('Form data:', new FormData(formElement));
+    const formData = new FormData(formElement);
+    const payload = {
+      firstName: formData.get('firstName'),
+      lastName: formData.get('lastName'),
+      email: formData.get('email'),
+      phone: formData.get('phone'),
+      subject: formData.get('subject'),
+      message: formData.get('message'),
+    };
 
-    emailjs.sendForm('service_ve5b4mi', 'template_gr58qjl', formElement, {
-      publicKey: 'Vmg1ncOwkcXgjgKhc',
-    }).then(
-      (response) => {
-        console.log('SUCCESS!', response.status, response.text);
-        setSubmitStatus('success');
-        if (formRef.current) {
-          formRef.current.reset();
+    // Save to the database first so every enquiry is always visible in the admin panel,
+    // regardless of whether the EmailJS notification email succeeds or fails.
+    let savedToDatabase = false;
+    try {
+      const res = await fetch(submitUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      savedToDatabase = res.ok;
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        console.error('Failed to save contact submission:', json.error);
+      }
+    } catch (err) {
+      console.error('Failed to save contact submission:', err);
+    }
+
+    // Best-effort instant email notification - not required for the enquiry to be recorded.
+    emailjs
+      .sendForm('service_ve5b4mi', 'template_gr58qjl', formElement, {
+        publicKey: 'Vmg1ncOwkcXgjgKhc',
+      })
+      .catch((error) => {
+        console.error('EmailJS notification failed (submission was still saved):', error);
+      })
+      .finally(() => {
+        if (savedToDatabase) {
+          setSubmitStatus('success');
+          if (formRef.current) {
+            formRef.current.reset();
+          }
+        } else {
+          setSubmitStatus('error');
         }
-        
-        // Clear success message after 5 seconds
-        setTimeout(() => {
-          setSubmitStatus(null);
-        }, 5000);
-      },
-      (error) => {
-        console.error('FAILED...', error);
-        console.error('Error details:', {
-          text: error?.text,
-          status: error?.status,
-          message: error?.message,
-          error: error
-        });
-        setSubmitStatus('error');
-        
-        // Clear error message after 5 seconds
-        setTimeout(() => {
-          setSubmitStatus(null);
-        }, 5000);
-      },
-    ).finally(() => {
-      setIsLoading(false);
-    });
+        setIsLoading(false);
+        setTimeout(() => setSubmitStatus(null), 5000);
+      });
   };
 
   return (
@@ -85,9 +99,9 @@ const Contactus = () => {
           Get in Touch with <span className="title-accent">SWAMPURNA</span>
         </h1>
         <p className="hero-description">
-          Whether you have questions about our programs, want to volunteer, or are 
-          interested in collaborating with us, we'd love to hear from you! Use any 
-          of the options below to reach us, and we'll get back to you as soon as possible.
+          Whether you have questions about our programs, want to volunteer, or are
+          interested in collaborating with us, we&apos;d love to hear from you! Use any
+          of the options below to reach us, and we&apos;ll get back to you as soon as possible.
         </p>
       </HeroSection>
 
@@ -97,7 +111,7 @@ const Contactus = () => {
         <ContactInfoCard>
           <h2>Contact Information</h2>
           <p className="info-subtitle">
-            We're always here to help. You can also reach us directly via the contact details below.
+            We&apos;re always here to help. You can also reach us directly via the contact details below.
           </p>
           
           <div className="contact-items">
@@ -239,7 +253,7 @@ const Contactus = () => {
             {submitStatus === 'success' && (
               <SuccessMessage>
                 <FiCheckCircle />
-                <span>Message sent successfully! We'll get back to you soon.</span>
+                <span>Message sent successfully! We&apos;ll get back to you soon.</span>
               </SuccessMessage>
             )}
 
