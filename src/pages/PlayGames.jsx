@@ -37,6 +37,16 @@ const PlayGames = () => {
       icon: "🧠",
       src: "/games/menstruation-knowledge/index.html",
     },
+    {
+      title: "Cycle Quest: 2 Month Journey",
+      icon: "🎲",
+      src: "/games/cycle-quest/index.html",
+    },
+    {
+      title: "Cycle Defense Pro",
+      icon: "🛡️",
+      src: "/games/cycle-tower-defense/index.html",
+    },
   ];
 
   const [selectedGame, setSelectedGame] = useState(null);
