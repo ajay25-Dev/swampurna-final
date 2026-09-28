@@ -1179,19 +1179,19 @@ async function getDynamicPeriodArticlesKnowledge() {
 const CHATBOT_FEWSHOT_EXAMPLES = `EXAMPLES (for calibration of tone, structure and status only - never copy these verbatim, never reuse their exact wording):
 
 Q: "I have bad period cramps and heavy bleeding, what can I do?"
-A: {"status":"supported","answer":"Cramps and heavier flow days are a common, normal part of many periods. Here's why and what can help: the uterus contracts to shed its lining, and prostaglandins (natural compounds behind this) tend to be higher on heavier-flow days, which is why cramps often feel stronger then. A heating pad on your lower abdomen, gentle movement or stretching, staying hydrated, and resting when your body asks for it can all genuinely ease the discomfort. Take it one cycle at a time and be kind to yourself on the harder days - and if the pain ever stops you from doing normal activities, keeps getting worse cycle after cycle, or doesn't ease with rest, please see a doctor so they can check for any underlying cause.","source_ids":["health-guide"]}
+A: {"status":"supported","answer":"Cramps and heavier flow days are a common, normal part of many periods. Here's why and what can help: the uterus contracts to shed its lining, and prostaglandins (natural compounds behind this) tend to be higher on heavier-flow days, which is why cramps often feel stronger then. A heating pad on your lower abdomen, gentle movement or stretching, staying hydrated, and resting when your body asks for it can all genuinely ease the discomfort. Take it one cycle at a time and be kind to yourself on the harder days - and if the pain ever stops you from doing normal activities, keeps getting worse cycle after cycle, or doesn't ease with rest, please see a doctor so they can check for any underlying cause.","source_ids":["health-guide"],"related_questions":["What foods can help with period cramps?","How can I improve sleep during my period?","What counts as unusually heavy bleeding?"]}
 
 Q: "I'm soaking a pad every hour for the last 3 hours and I feel dizzy, like I might faint"
-A: {"status":"urgent","answer":"This needs prompt medical attention rather than general guidance.","source_ids":["contact"]}
+A: {"status":"urgent","answer":"This needs prompt medical attention rather than general guidance.","source_ids":["contact"],"related_questions":[]}
 
 Q: "Can you write me a Python function to sort a list?"
-A: {"status":"unsupported","answer":"Not covered by Swampurna's approved content.","source_ids":[]}
+A: {"status":"unsupported","answer":"Not covered by Swampurna's approved content.","source_ids":[],"related_questions":[]}
 
 Q: "What's the best menstrual cup brand to buy?"
-A: {"status":"supported","answer":"There's no single 'best' brand - it really depends on what suits your body and routine. Swampurna doesn't recommend specific brands, but menstrual cups are one of several suitable options alongside pads and reusable cloth, and the right choice usually comes down to comfort, access, cost, and using it correctly and hygienically. Take your time exploring what feels right for you - our menstrual products page is a good place to compare the options.","source_ids":["products"]}
+A: {"status":"supported","answer":"There's no single 'best' brand - it really depends on what suits your body and routine. Swampurna doesn't recommend specific brands, but menstrual cups are one of several suitable options alongside pads and reusable cloth, and the right choice usually comes down to comfort, access, cost, and using it correctly and hygienically. Take your time exploring what feels right for you - our menstrual products page is a good place to compare the options.","source_ids":["products"],"related_questions":["How often should I change a pad or tampon?","Are reusable cloth pads hygienic?"]}
 
 Q: "How can I join Swampurna?"
-A: {"status":"supported","answer":"There are a few good ways to get involved. You can join the movement, volunteer, or take part in current programmes and initiatives - whichever fits your time and interest best. It's great that you want to be part of this - the Join the Movement page has the current ways to participate.","source_ids":["join"]}
+A: {"status":"supported","answer":"There are a few good ways to get involved. You can join the movement, volunteer, or take part in current programmes and initiatives - whichever fits your time and interest best. It's great that you want to be part of this - the Join the Movement page has the current ways to participate.","source_ids":["join"],"related_questions":["What programmes does Swampurna run?","Can I volunteer without prior experience?"]}
 `;
 
 function buildChatbotInstructions(dynamicKnowledge = "", articlesKnowledge = "") {
@@ -1210,7 +1210,8 @@ function buildChatbotInstructions(dynamicKnowledge = "", articlesKnowledge = "")
     "- Use status \"unsupported\" only when the question's topic has no relevant approved knowledge anywhere below (for example: unrelated topics, or a specific detail never covered by any section). If the question is about menstrual health or Swampurna and at least part of it is covered, answer with what IS covered as \"supported\" rather than refusing the whole question.\n" +
     "- Do not ask follow-up questions.\n" +
     "- For supported answers, structure the answer as: (1) one brief opening sentence that directly summarizes the answer, (2) 2-4 sentences of clear explanation drawn only from the approved knowledge, including the 'why' behind any guidance where the knowledge explains it, (3) one short, warm closing sentence - encouragement, reassurance, or (only where relevant) a gentle suggestion to see a doctor. Keep the whole answer to about 4-6 sentences total, plain-language, and select only relevant source IDs from: faqs, health-guide, products, programmes, impact-stories, join, contact.\n" +
-    "- Vary your sentence openings and phrasing naturally across answers instead of reusing the same template sentence every time; stay accurate and concise regardless.\n\n" +
+    "- Vary your sentence openings and phrasing naturally across answers instead of reusing the same template sentence every time; stay accurate and concise regardless.\n" +
+    "- For \"supported\" answers only, also suggest 2 to 3 short, natural follow-up questions in \"related_questions\" - things the user could tap next that you could ALSO answer as \"supported\" from the approved knowledge above. Do not repeat or rephrase the user's own question. Keep each under 80 characters, phrased as a question. For \"urgent\" or \"unsupported\" status, return an empty array for related_questions.\n\n" +
     CHATBOT_FEWSHOT_EXAMPLES +
     "\nBASE APPROVED KNOWLEDGE:\n" + CHATBOT_KNOWLEDGE +
     "\n\nAPPROVED HEALTH TIP ARTICLES (use these for cramps, flow, mood, sleep, hygiene, stress, wellness questions):\n" + (articlesKnowledge || "No health tip articles are available right now.") +
@@ -1241,9 +1242,26 @@ const CHATBOT_RESPONSE_SCHEMA = {
     status: { type: "string", enum: ["supported", "unsupported", "urgent"] },
     answer: { type: "string", minLength: 1, maxLength: 1200 },
     source_ids: { type: "array", items: { type: "string", enum: ["faqs", "health-guide", "products", "programmes", "impact-stories", "join", "contact"] }, maxItems: 3 },
+    related_questions: { type: "array", items: { type: "string", minLength: 1, maxLength: 100 }, maxItems: 3 },
   },
-  required: ["status", "answer", "source_ids"],
+  required: ["status", "answer", "source_ids", "related_questions"],
 };
+
+function sanitizeRelatedQuestions(raw) {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set();
+  const cleaned = [];
+  for (const item of raw) {
+    const text = String(item || "").trim();
+    if (!text || text.length > 100) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    cleaned.push(text);
+    if (cleaned.length >= 3) break;
+  }
+  return cleaned;
+}
 
 app.post("/api/v1/chat/answer", apiAuthOptional, async (req, res) => {
   const question = String(req.body?.question || "").trim();
@@ -1297,23 +1315,24 @@ app.post("/api/v1/chat/answer", apiAuthOptional, async (req, res) => {
       if (result === null) {
         console.error("AI chatbot: no usable status from provider response", JSON.stringify(data).slice(0, 2000));
       }
-      return res.json({ answer: CHATBOT_FALLBACK_ANSWER, sources: [CHATBOT_SOURCE_BY_ID.contact] });
+      return res.json({ answer: CHATBOT_FALLBACK_ANSWER, sources: [CHATBOT_SOURCE_BY_ID.contact], related_questions: [] });
     }
 
     if (result.status === "urgent") {
-      return res.json({ answer: CHATBOT_URGENT_ANSWER, sources: [CHATBOT_SOURCE_BY_ID.contact] });
+      return res.json({ answer: CHATBOT_URGENT_ANSWER, sources: [CHATBOT_SOURCE_BY_ID.contact], related_questions: [] });
     }
     if (result.status === "unsupported") {
-      return res.json({ answer: CHATBOT_FALLBACK_ANSWER, sources: [CHATBOT_SOURCE_BY_ID.contact] });
+      return res.json({ answer: CHATBOT_FALLBACK_ANSWER, sources: [CHATBOT_SOURCE_BY_ID.contact], related_questions: [] });
     }
 
     const answer = String(result.answer || "").trim();
     const sources = [...new Set((result.source_ids || []).filter((id) => CHATBOT_SOURCE_BY_ID[id]))]
       .map((id) => CHATBOT_SOURCE_BY_ID[id]);
     if (!answer || sources.length === 0) {
-      return res.json({ answer: CHATBOT_FALLBACK_ANSWER, sources: [CHATBOT_SOURCE_BY_ID.contact] });
+      return res.json({ answer: CHATBOT_FALLBACK_ANSWER, sources: [CHATBOT_SOURCE_BY_ID.contact], related_questions: [] });
     }
-    return res.json({ answer, sources });
+    const relatedQuestions = sanitizeRelatedQuestions(result.related_questions);
+    return res.json({ answer, sources, related_questions: relatedQuestions });
   } catch (error) {
     console.error("AI chatbot request error", error?.message || error);
     return res.status(502).json({ error: "The AI assistant is temporarily unavailable. Please use Contact Us for support." });
