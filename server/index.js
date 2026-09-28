@@ -1493,6 +1493,39 @@ app.get("/api/public/newsarticles", async (req, res) => {
   return res.json({ data: articles });
 });
 
+// Same content_items table the website queries directly via its own
+// Supabase client for the Faqs page (src/lib/contentApi.js) - this mirrors
+// that query server-side so the app can reach the same live FAQ content
+// through the existing API instead of needing direct Supabase access.
+app.get("/api/public/faqs", async (req, res) => {
+  const { data, error } = await supabase
+    .from("content_items")
+    .select("*")
+    .eq("page_slug", "Faqs")
+    .eq("section_key", "faq_items")
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  // Same visibility rule as the website's isPubliclyVisible() - hide drafts
+  // and anything past its expiry.
+  const now = Date.now();
+  const visible = (data || []).filter((item) => {
+    const status = item?.meta?.status;
+    if (status === "draft") return false;
+    const expiresAt = item?.meta?.expires_at;
+    if (expiresAt) {
+      const expiry = new Date(expiresAt).getTime();
+      if (!Number.isNaN(expiry) && expiry < now) return false;
+    }
+    return true;
+  });
+
+  return res.json({ data: visible });
+});
+
 app.get("/api/public/newsarticles/category/:categorySlug", async (req, res) => {
   const categorySlug = String(req.params.categorySlug || "").trim().toLowerCase();
   if (!categorySlug) {
