@@ -832,6 +832,53 @@ async function getPostCounts(postIds = []) {
   return { likeCounts, commentCounts };
 }
 
+// Same shape as getPostCounts, but reactions are split into like/dislike
+// (posts only ever had a single "like"), and optionally reports the
+// requesting user's own reaction per snap.
+async function getSnapCounts(snapIds = [], userId = null) {
+  if (!snapIds.length) {
+    return { likeCounts: {}, dislikeCounts: {}, commentCounts: {}, myReactions: {} };
+  }
+
+  const { data: reactionsData, error: reactionsError } = await supabase
+    .from("cycle_snap_reactions")
+    .select("snap_id, user_id, reaction_type")
+    .in("snap_id", snapIds);
+  if (reactionsError) throw new Error(reactionsError.message);
+
+  const { data: commentsData, error: commentsError } = await supabase
+    .from("cycle_snap_comments")
+    .select("snap_id")
+    .in("snap_id", snapIds);
+  if (commentsError) throw new Error(commentsError.message);
+
+  const likeCounts = {};
+  const dislikeCounts = {};
+  const commentCounts = {};
+  const myReactions = {};
+  for (const id of snapIds) {
+    likeCounts[id] = 0;
+    dislikeCounts[id] = 0;
+    commentCounts[id] = 0;
+    myReactions[id] = null;
+  }
+  for (const reaction of reactionsData || []) {
+    if (reaction.reaction_type === "like") {
+      likeCounts[reaction.snap_id] = (likeCounts[reaction.snap_id] || 0) + 1;
+    } else if (reaction.reaction_type === "dislike") {
+      dislikeCounts[reaction.snap_id] = (dislikeCounts[reaction.snap_id] || 0) + 1;
+    }
+    if (userId && reaction.user_id === userId) {
+      myReactions[reaction.snap_id] = reaction.reaction_type;
+    }
+  }
+  for (const comment of commentsData || []) {
+    commentCounts[comment.snap_id] = (commentCounts[comment.snap_id] || 0) + 1;
+  }
+
+  return { likeCounts, dislikeCounts, commentCounts, myReactions };
+}
+
 async function buildUpcomingReminderEventsForUser({ userId, days = 30 }) {
   const safeDays = Math.min(Math.max(Number(days) || 30, 1), 90);
   const startDate = new Date();
@@ -4891,10 +4938,20 @@ app.get("/api/v1/cycle-snaps", apiAuthOptional, async (req, res) => {
     customersMap = Object.fromEntries((customersData || []).map((c) => [c.user_id, c]));
   }
 
+  const snapIds = (data || []).map((row) => row.id);
+  const { likeCounts, dislikeCounts, commentCounts, myReactions } = await getSnapCounts(
+    snapIds,
+    req.user?.id || null,
+  ).catch(() => ({ likeCounts: {}, dislikeCounts: {}, commentCounts: {}, myReactions: {} }));
+
   const rows = (data || []).map((row) => ({
     ...row,
     author: usersMap[row.user_id] || null,
     customer: customersMap[row.user_id] || null,
+    like_count: likeCounts[row.id] || 0,
+    dislike_count: dislikeCounts[row.id] || 0,
+    comment_count: commentCounts[row.id] || 0,
+    my_reaction: myReactions[row.id] || null,
   }));
   return res.json({ data: rows, meta: { limit, offset, mine, status: status || null } });
 });
@@ -4910,7 +4967,148 @@ app.get("/api/v1/cycle-snaps/:id", apiAuthOptional, async (req, res) => {
   }
 
   const { data: author } = await supabase.from("users").select("id, email").eq("id", data.user_id).maybeSingle();
-  return res.json({ data: { ...data, author: author || null } });
+  const { likeCounts, dislikeCounts, commentCounts, myReactions } = await getSnapCounts(
+    [id],
+    req.user?.id || null,
+  ).catch(() => ({ likeCounts: {}, dislikeCounts: {}, commentCounts: {}, myReactions: {} }));
+
+  return res.json({
+    data: {
+      ...data,
+      author: author || null,
+      like_count: likeCounts[id] || 0,
+      dislike_count: dislikeCounts[id] || 0,
+      comment_count: commentCounts[id] || 0,
+      my_reaction: myReactions[id] || null,
+    },
+  });
+});
+
+// Toggles a like/dislike reaction: tapping the same reaction again clears
+// it (back to neutral), tapping the other one switches it - mirrors a
+// YouTube-style single-reaction-per-user model rather than two
+// independent counters.
+app.post("/api/v1/cycle-snaps/:id/react", apiAuthRequired, async (req, res) => {
+  const { id } = req.params;
+  const reactionType = String(req.body?.type || "").toLowerCase();
+  if (!["like", "dislike"].includes(reactionType)) {
+    return res.status(400).json({ error: "type must be 'like' or 'dislike'" });
+  }
+
+  const { data: snap } = await supabase.from("cycle_snaps").select("id, status").eq("id", id).maybeSingle();
+  if (!snap || snap.status !== "approved") {
+    return res.status(404).json({ error: "Cycle snap not found" });
+  }
+
+  const { data: existing } = await supabase
+    .from("cycle_snap_reactions")
+    .select("reaction_type")
+    .eq("snap_id", id)
+    .eq("user_id", req.user.id)
+    .maybeSingle();
+
+  let myReaction = reactionType;
+  if (existing?.reaction_type === reactionType) {
+    // Same reaction tapped again - remove it.
+    const { error: deleteError } = await supabase
+      .from("cycle_snap_reactions")
+      .delete()
+      .eq("snap_id", id)
+      .eq("user_id", req.user.id);
+    if (deleteError) return res.status(400).json({ error: deleteError.message });
+    myReaction = null;
+  } else if (existing) {
+    // Switching from like to dislike or vice versa.
+    const { error: updateError } = await supabase
+      .from("cycle_snap_reactions")
+      .update({ reaction_type: reactionType })
+      .eq("snap_id", id)
+      .eq("user_id", req.user.id);
+    if (updateError) return res.status(400).json({ error: updateError.message });
+  } else {
+    const { error: insertError } = await supabase
+      .from("cycle_snap_reactions")
+      .insert({ snap_id: id, user_id: req.user.id, reaction_type: reactionType });
+    if (insertError) return res.status(400).json({ error: insertError.message });
+  }
+
+  const { likeCounts, dislikeCounts } = await getSnapCounts([id]).catch(() => ({
+    likeCounts: {},
+    dislikeCounts: {},
+  }));
+
+  return res.json({
+    data: {
+      snap_id: id,
+      my_reaction: myReaction,
+      like_count: likeCounts[id] || 0,
+      dislike_count: dislikeCounts[id] || 0,
+    },
+  });
+});
+
+app.get("/api/v1/cycle-snaps/:id/comments", async (req, res) => {
+  const { id } = req.params;
+  const { data: snap } = await supabase.from("cycle_snaps").select("id, status").eq("id", id).maybeSingle();
+  if (!snap || snap.status !== "approved") {
+    return res.status(404).json({ error: "Cycle snap not found" });
+  }
+
+  const { data, error } = await supabase
+    .from("cycle_snap_comments")
+    .select("*")
+    .eq("snap_id", id)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const userIds = Array.from(new Set((data || []).map((c) => c.user_id).filter(Boolean)));
+  let usersMap = {};
+  if (userIds.length) {
+    const { data: usersData } = await supabase
+      .from("users")
+      .select("id, email, role")
+      .in("id", userIds);
+    usersMap = Object.fromEntries((usersData || []).map((u) => [u.id, u]));
+  }
+
+  const comments = (data || []).map((comment) => ({
+    ...comment,
+    author: usersMap[comment.user_id] || null,
+  }));
+
+  return res.json({ data: comments });
+});
+
+app.post("/api/v1/cycle-snaps/:id/comments", apiAuthRequired, async (req, res) => {
+  const { id } = req.params;
+  const content = String(req.body?.content || "").trim();
+  if (!content) {
+    return res.status(400).json({ error: "Comment content is required" });
+  }
+
+  const { data: snap } = await supabase.from("cycle_snaps").select("id, status").eq("id", id).maybeSingle();
+  if (!snap || snap.status !== "approved") {
+    return res.status(404).json({ error: "Cycle snap not found" });
+  }
+
+  const { data, error } = await supabase
+    .from("cycle_snap_comments")
+    .insert({
+      snap_id: id,
+      user_id: req.user.id,
+      content,
+    })
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to add comment" });
+  }
+
+  return res.json({ data });
 });
 
 app.put("/api/v1/cycle-snaps/:id/status", apiAuthRequired, async (req, res) => {
