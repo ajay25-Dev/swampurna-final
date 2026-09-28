@@ -3437,10 +3437,15 @@ app.put("/api/v1/period-tracker/setup", apiAuthRequired, async (req, res) => {
   if (ovulation_window_days !== undefined) updates.ovulation_window_days = ovulation_window_days === null ? null : Number(ovulation_window_days);
   if (notes !== undefined) updates.notes = notes ? String(notes).trim() : null;
 
+  // Was a plain .update().eq().single() - if this user had no existing
+  // period_tracker_settings row yet (e.g. never finished initial setup),
+  // the UPDATE matched zero rows and .single() threw PostgREST's raw
+  // "Cannot coerce the result to a single JSON object" error straight
+  // through to the client. Upserting creates the row on first save
+  // instead of assuming it already exists.
   const { data, error } = await supabase
     .from("period_tracker_settings")
-    .update(updates)
-    .eq("user_id", req.user.id)
+    .upsert({ user_id: req.user.id, ...updates }, { onConflict: "user_id" })
     .select("*")
     .single();
 
