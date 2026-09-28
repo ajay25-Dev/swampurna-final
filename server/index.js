@@ -1103,6 +1103,9 @@ const CHATBOT_SOURCES = [
   { id: "faqs", label: "Frequently asked questions", url: "/Faqs" },
   { id: "health-guide", label: "Menstrual health guide", url: "/Guidetomenstrualhealth" },
   { id: "products", label: "Menstrual products", url: "/Menstrualproducts" },
+  { id: "programmes", label: "Our programmes", url: "/Programinitiative" },
+  { id: "impact-stories", label: "Impact stories", url: "/Impactstories" },
+  { id: "join", label: "Join the movement", url: "/Joinmovement" },
   { id: "contact", label: "Contact Swampurna", url: "/Contactus" },
 ];
 const CHATBOT_SOURCE_BY_ID = Object.fromEntries(CHATBOT_SOURCES.map((source) => [source.id, source]));
