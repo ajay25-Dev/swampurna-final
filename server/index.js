@@ -832,6 +832,20 @@ async function getPostCounts(postIds = []) {
   return { likeCounts, commentCounts };
 }
 
+// customers.name is the actual editable display name (same field the
+// app's Edit Profile screen writes to) - author objects built from just
+// the users table only ever carry email, which is why comments/posts/snaps
+// showed raw email addresses instead of a name.
+async function getCustomerNames(userIds = []) {
+  if (!userIds.length) return {};
+  const { data, error } = await supabase
+    .from("customers")
+    .select("user_id, name")
+    .in("user_id", userIds);
+  if (error) return {};
+  return Object.fromEntries((data || []).map((c) => [c.user_id, c.name]));
+}
+
 // Same shape as getPostCounts, but reactions are split into like/dislike
 // (posts only ever had a single "like"), and optionally reports the
 // requesting user's own reaction per snap.
@@ -3070,10 +3084,13 @@ app.get("/api/v1/posts", apiAuthOptional, async (req, res) => {
       .in("id", userIds);
     usersMap = Object.fromEntries((usersData || []).map((u) => [u.id, u]));
   }
+  const namesMap = await getCustomerNames(userIds);
 
   const formatted = (posts || []).map((post) => ({
     ...post,
-    author: usersMap[post.user_id] || null,
+    author: usersMap[post.user_id]
+      ? { ...usersMap[post.user_id], name: namesMap[post.user_id] || null }
+      : null,
     like_count: likeCounts[post.id] || 0,
     comment_count: commentCounts[post.id] || 0,
     liked_by_me: likedByMeSet.has(post.id),
@@ -3115,11 +3132,12 @@ app.get("/api/v1/posts/:id", apiAuthOptional, async (req, res) => {
     .select("id, email, role")
     .eq("id", post.user_id)
     .maybeSingle();
+  const authorNames = await getCustomerNames(author ? [author.id] : []);
 
   return res.json({
     data: {
       ...post,
-      author: author || null,
+      author: author ? { ...author, name: authorNames[author.id] || null } : null,
       like_count: likeCounts[post.id] || 0,
       comment_count: commentCounts[post.id] || 0,
       liked_by_me: likedByMe,
@@ -3195,10 +3213,13 @@ app.get("/api/v1/posts/:id/comments", async (req, res) => {
       .in("id", userIds);
     usersMap = Object.fromEntries((usersData || []).map((u) => [u.id, u]));
   }
+  const namesMap = await getCustomerNames(userIds);
 
   const comments = (data || []).map((comment) => ({
     ...comment,
-    author: usersMap[comment.user_id] || null,
+    author: usersMap[comment.user_id]
+      ? { ...usersMap[comment.user_id], name: namesMap[comment.user_id] || null }
+      : null,
   }));
 
   return res.json({ data: comments });
@@ -4967,6 +4988,7 @@ app.get("/api/v1/cycle-snaps/:id", apiAuthOptional, async (req, res) => {
   }
 
   const { data: author } = await supabase.from("users").select("id, email").eq("id", data.user_id).maybeSingle();
+  const authorNames = await getCustomerNames(author ? [author.id] : []);
   const { likeCounts, dislikeCounts, commentCounts, myReactions } = await getSnapCounts(
     [id],
     req.user?.id || null,
@@ -4975,7 +4997,7 @@ app.get("/api/v1/cycle-snaps/:id", apiAuthOptional, async (req, res) => {
   return res.json({
     data: {
       ...data,
-      author: author || null,
+      author: author ? { ...author, name: authorNames[author.id] || null } : null,
       like_count: likeCounts[id] || 0,
       dislike_count: dislikeCounts[id] || 0,
       comment_count: commentCounts[id] || 0,
@@ -5073,10 +5095,13 @@ app.get("/api/v1/cycle-snaps/:id/comments", async (req, res) => {
       .in("id", userIds);
     usersMap = Object.fromEntries((usersData || []).map((u) => [u.id, u]));
   }
+  const namesMap = await getCustomerNames(userIds);
 
   const comments = (data || []).map((comment) => ({
     ...comment,
-    author: usersMap[comment.user_id] || null,
+    author: usersMap[comment.user_id]
+      ? { ...usersMap[comment.user_id], name: namesMap[comment.user_id] || null }
+      : null,
   }));
 
   return res.json({ data: comments });
