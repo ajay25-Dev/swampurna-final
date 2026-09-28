@@ -2931,7 +2931,7 @@ app.get("/api/v1/posts/:id", apiAuthOptional, async (req, res) => {
     .eq("id", id)
     .single();
 
-  if (error || !post) {
+  if (error || !post || post.status !== "published") {
     return res.status(404).json({ error: "Post not found" });
   }
 
@@ -2970,8 +2970,8 @@ app.get("/api/v1/posts/:id", apiAuthOptional, async (req, res) => {
 
 app.post("/api/v1/posts/:id/like", apiAuthRequired, async (req, res) => {
   const { id } = req.params;
-  const { data: post } = await supabase.from("posts").select("id").eq("id", id).maybeSingle();
-  if (!post) {
+  const { data: post } = await supabase.from("posts").select("id, status").eq("id", id).maybeSingle();
+  if (!post || post.status !== "published") {
     return res.status(404).json({ error: "Post not found" });
   }
 
@@ -3012,6 +3012,11 @@ app.post("/api/v1/posts/:id/like", apiAuthRequired, async (req, res) => {
 
 app.get("/api/v1/posts/:id/comments", async (req, res) => {
   const { id } = req.params;
+  const { data: post } = await supabase.from("posts").select("id, status").eq("id", id).maybeSingle();
+  if (!post || post.status !== "published") {
+    return res.status(404).json({ error: "Post not found" });
+  }
+
   const { data, error } = await supabase
     .from("post_comments")
     .select("*")
@@ -3047,8 +3052,8 @@ app.post("/api/v1/posts/:id/comments", apiAuthRequired, async (req, res) => {
     return res.status(400).json({ error: "Comment content is required" });
   }
 
-  const { data: post } = await supabase.from("posts").select("id").eq("id", id).maybeSingle();
-  if (!post) {
+  const { data: post } = await supabase.from("posts").select("id, status").eq("id", id).maybeSingle();
+  if (!post || post.status !== "published") {
     return res.status(404).json({ error: "Post not found" });
   }
 
@@ -3067,6 +3072,130 @@ app.post("/api/v1/posts/:id/comments", apiAuthRequired, async (req, res) => {
   }
 
   return res.json({ data });
+});
+
+app.get("/api/admin/posts", authRequired, async (req, res) => {
+  const status = req.query.status ? String(req.query.status).trim().toLowerCase() : "";
+  const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+
+  let query = supabase
+    .from("posts")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (status) query = query.eq("status", status);
+
+  const { data: posts, error } = await query;
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const postIds = (posts || []).map((p) => p.id);
+  const { likeCounts, commentCounts } = await getPostCounts(postIds).catch(() => ({
+    likeCounts: {},
+    commentCounts: {},
+  }));
+
+  const userIds = Array.from(new Set((posts || []).map((p) => p.user_id).filter(Boolean)));
+  let usersMap = {};
+  if (userIds.length) {
+    const { data: usersData } = await supabase
+      .from("users")
+      .select("id, email, role")
+      .in("id", userIds);
+    usersMap = Object.fromEntries((usersData || []).map((u) => [u.id, u]));
+  }
+
+  const formatted = (posts || []).map((post) => ({
+    ...post,
+    author: usersMap[post.user_id] || null,
+    like_count: likeCounts[post.id] || 0,
+    comment_count: commentCounts[post.id] || 0,
+  }));
+
+  return res.json({ data: formatted, meta: { limit, offset } });
+});
+
+app.get("/api/admin/posts/:id", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const { data: post, error } = await supabase.from("posts").select("*").eq("id", id).single();
+  if (error || !post) {
+    return res.status(404).json({ error: "Post not found" });
+  }
+
+  const { data: author } = await supabase
+    .from("users")
+    .select("id, email, role")
+    .eq("id", post.user_id)
+    .maybeSingle();
+
+  const { data: likes, error: likesError } = await supabase
+    .from("post_likes")
+    .select("post_id, user_id, created_at")
+    .eq("post_id", id)
+    .order("created_at", { ascending: false });
+  if (likesError) return res.status(400).json({ error: likesError.message });
+
+  const { data: comments, error: commentsError } = await supabase
+    .from("post_comments")
+    .select("*")
+    .eq("post_id", id)
+    .order("created_at", { ascending: false });
+  if (commentsError) return res.status(400).json({ error: commentsError.message });
+
+  const likeUserIds = Array.from(new Set((likes || []).map((l) => l.user_id).filter(Boolean)));
+  const commentUserIds = Array.from(new Set((comments || []).map((c) => c.user_id).filter(Boolean)));
+  const allUserIds = Array.from(new Set([...likeUserIds, ...commentUserIds]));
+  let usersMap = {};
+  if (allUserIds.length) {
+    const { data: usersData } = await supabase
+      .from("users")
+      .select("id, email, role")
+      .in("id", allUserIds);
+    usersMap = Object.fromEntries((usersData || []).map((u) => [u.id, u]));
+  }
+
+  return res.json({
+    data: {
+      ...post,
+      author: author || null,
+      like_count: (likes || []).length,
+      comment_count: (comments || []).length,
+      likes: (likes || []).map((l) => ({ ...l, user: usersMap[l.user_id] || null })),
+      comments: (comments || []).map((c) => ({ ...c, author: usersMap[c.user_id] || null })),
+    },
+  });
+});
+
+app.put("/api/admin/posts/:id/status", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const status = String(req.body?.status || "").trim().toLowerCase();
+  if (!["published", "disabled"].includes(status)) {
+    return res.status(400).json({ error: "Invalid status" });
+  }
+  const { data, error } = await supabase
+    .from("posts")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to update post" });
+  }
+  return res.json({ data });
+});
+
+app.delete("/api/admin/posts/:id", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const { data, error } = await supabase.from("posts").delete().eq("id", id).select("id").single();
+  if (error || !data) {
+    if (error?.code === "PGRST116") {
+      return res.status(404).json({ error: "Post not found" });
+    }
+    return res.status(400).json({ error: error?.message || "Failed to delete post" });
+  }
+  return res.json({ message: "Post deleted", data });
 });
 
 app.get("/api/v1/period-tracker/setup", apiAuthRequired, async (req, res) => {
@@ -3548,6 +3677,99 @@ app.put("/api/v1/period-tracker/user-options", apiAuthRequired, async (req, res)
   return res.json({ data });
 });
 
+const ARTICLE_PUBLIC_FIELDS =
+  "id, category_key, category_label, slug, title, detail_title, content, cycle_phase, priority, sort_order, target_options, created_at, updated_at";
+
+async function getUserOptionTags(userId) {
+  const { data } = await supabase
+    .from("period_tracker_user_options")
+    .select("selections")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const selections = data?.selections || {};
+  const tags = new Set();
+  for (const [categoryKey, rawValue] of Object.entries(selections)) {
+    const values = Array.isArray(rawValue) ? rawValue : [rawValue];
+    for (const value of values) {
+      if (value) tags.add(`${categoryKey}:${value}`);
+    }
+  }
+  return tags;
+}
+
+function filterArticlesByUserTags(articles, selectedTags) {
+  if (!selectedTags || selectedTags.size === 0) return articles;
+  return articles.filter((article) => {
+    const targets = Array.isArray(article.target_options) ? article.target_options : [];
+    if (targets.length === 0) return true;
+    return targets.some((tag) => selectedTags.has(tag));
+  });
+}
+
+function normalizePeriodTrackerOptionPayload(body) {
+  const categoryKey = String(body?.category_key || "").trim().toLowerCase();
+  const categoryLabel = String(body?.category_label || "").trim();
+  const optionKey = String(body?.option_key || "").trim().toLowerCase();
+  const optionLabel = String(body?.option_label || "").trim();
+
+  if (!categoryKey || !categoryLabel || !optionKey || !optionLabel) {
+    return { error: "category_key, category_label, option_key and option_label are required" };
+  }
+
+  return {
+    value: {
+      category_key: categoryKey,
+      category_label: categoryLabel,
+      option_key: optionKey,
+      option_label: optionLabel,
+      purpose: body?.purpose ? String(body.purpose).trim() : null,
+      prediction_effect: body?.prediction_effect ? String(body.prediction_effect).trim() : null,
+      confidence_impact: body?.confidence_impact ? String(body.confidence_impact).trim() : null,
+      sort_order: Number.isFinite(Number(body?.sort_order)) ? Number(body.sort_order) : 0,
+      is_active: body?.is_active === undefined ? true : Boolean(body.is_active),
+    },
+  };
+}
+
+function normalizePeriodTrackerArticlePayload(body) {
+  const categoryKey = String(body?.category_key || "").trim().toLowerCase();
+  const categoryLabel = String(body?.category_label || "").trim();
+  const slug = String(body?.slug || "").trim().toLowerCase();
+  const title = String(body?.title || "").trim();
+  const detailTitle = String(body?.detail_title || title).trim();
+  const content = String(body?.content || "").trim();
+
+  if (!categoryKey || !categoryLabel || !slug || !title || !content) {
+    return { error: "category_key, category_label, slug, title and content are required" };
+  }
+
+  const rawTargets = Array.isArray(body?.target_options) ? body.target_options : [];
+  const targetOptions = Array.from(
+    new Set(
+      rawTargets
+        .map((tag) => String(tag || "").trim().toLowerCase())
+        .filter((tag) => tag && tag.includes(":"))
+    )
+  );
+
+  return {
+    value: {
+      category_key: categoryKey,
+      category_label: categoryLabel,
+      slug,
+      title,
+      detail_title: detailTitle,
+      content,
+      cycle_phase: body?.cycle_phase ? String(body.cycle_phase).trim() : null,
+      priority: body?.priority ? String(body.priority).trim() : null,
+      sort_order: Number.isFinite(Number(body?.sort_order)) ? Number(body.sort_order) : 0,
+      is_active: body?.is_active === undefined ? true : Boolean(body.is_active),
+      target_options: targetOptions,
+    },
+  };
+}
+
 app.get("/api/v1/period-tracker/articles", apiAuthRequired, async (req, res) => {
   const category = req.query.category ? String(req.query.category).trim().toLowerCase() : "";
   const cyclePhase = req.query.cycle_phase ? String(req.query.cycle_phase).trim() : "";
@@ -3555,7 +3777,7 @@ app.get("/api/v1/period-tracker/articles", apiAuthRequired, async (req, res) => 
 
   let query = supabase
     .from("period_tracker_articles")
-    .select("id, category_key, category_label, slug, title, detail_title, content, cycle_phase, priority, sort_order, created_at, updated_at")
+    .select(ARTICLE_PUBLIC_FIELDS)
     .eq("is_active", true)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
@@ -3569,14 +3791,20 @@ app.get("/api/v1/period-tracker/articles", apiAuthRequired, async (req, res) => 
     return res.status(400).json({ error: error.message });
   }
 
-  return res.json({ data: data || [], meta: { category: category || null, cycle_phase: cyclePhase || null, priority: priority || null } });
+  const selectedTags = await getUserOptionTags(req.user.id).catch(() => new Set());
+  const filtered = filterArticlesByUserTags(data || [], selectedTags);
+
+  return res.json({
+    data: filtered,
+    meta: { category: category || null, cycle_phase: cyclePhase || null, priority: priority || null },
+  });
 });
 
 app.get("/api/v1/period-tracker/articles/category/:category", apiAuthRequired, async (req, res) => {
   const category = String(req.params.category || "").trim().toLowerCase();
   const { data, error } = await supabase
     .from("period_tracker_articles")
-    .select("id, category_key, category_label, slug, title, detail_title, content, cycle_phase, priority, sort_order, created_at, updated_at")
+    .select(ARTICLE_PUBLIC_FIELDS)
     .eq("is_active", true)
     .eq("category_key", category)
     .order("sort_order", { ascending: true })
@@ -3586,14 +3814,17 @@ app.get("/api/v1/period-tracker/articles/category/:category", apiAuthRequired, a
     return res.status(400).json({ error: error.message });
   }
 
-  return res.json({ data: data || [], meta: { category } });
+  const selectedTags = await getUserOptionTags(req.user.id).catch(() => new Set());
+  const filtered = filterArticlesByUserTags(data || [], selectedTags);
+
+  return res.json({ data: filtered, meta: { category } });
 });
 
 app.get("/api/v1/period-tracker/articles/:slug", apiAuthRequired, async (req, res) => {
   const slug = String(req.params.slug || "").trim().toLowerCase();
   const { data, error } = await supabase
     .from("period_tracker_articles")
-    .select("id, category_key, category_label, slug, title, detail_title, content, cycle_phase, priority, sort_order, created_at, updated_at")
+    .select(ARTICLE_PUBLIC_FIELDS)
     .eq("is_active", true)
     .eq("slug", slug)
     .maybeSingle();
@@ -3606,6 +3837,132 @@ app.get("/api/v1/period-tracker/articles/:slug", apiAuthRequired, async (req, re
   }
 
   return res.json({ data });
+});
+
+app.get("/api/admin/period-tracker/options", authRequired, async (req, res) => {
+  const { data, error } = await supabase
+    .from("period_tracker_options")
+    .select("*")
+    .order("category_key", { ascending: true })
+    .order("sort_order", { ascending: true });
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  return res.json({ data: data || [] });
+});
+
+app.post("/api/admin/period-tracker/options", authRequired, async (req, res) => {
+  const payload = normalizePeriodTrackerOptionPayload(req.body);
+  if (payload.error) {
+    return res.status(400).json({ error: payload.error });
+  }
+  const { data, error } = await supabase
+    .from("period_tracker_options")
+    .insert(payload.value)
+    .select("*")
+    .single();
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to create option" });
+  }
+  return res.json({ data });
+});
+
+app.put("/api/admin/period-tracker/options/:id", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const payload = normalizePeriodTrackerOptionPayload(req.body);
+  if (payload.error) {
+    return res.status(400).json({ error: payload.error });
+  }
+  const { data, error } = await supabase
+    .from("period_tracker_options")
+    .update(payload.value)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to update option" });
+  }
+  return res.json({ data });
+});
+
+app.delete("/api/admin/period-tracker/options/:id", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const { data, error } = await supabase
+    .from("period_tracker_options")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .single();
+  if (error || !data) {
+    if (error?.code === "PGRST116") {
+      return res.status(404).json({ error: "Option not found" });
+    }
+    return res.status(400).json({ error: error?.message || "Failed to delete option" });
+  }
+  return res.json({ message: "Option deleted", data });
+});
+
+app.get("/api/admin/period-tracker/articles", authRequired, async (req, res) => {
+  const { data, error } = await supabase
+    .from("period_tracker_articles")
+    .select("*")
+    .order("category_key", { ascending: true })
+    .order("sort_order", { ascending: true });
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  return res.json({ data: data || [] });
+});
+
+app.post("/api/admin/period-tracker/articles", authRequired, async (req, res) => {
+  const payload = normalizePeriodTrackerArticlePayload(req.body);
+  if (payload.error) {
+    return res.status(400).json({ error: payload.error });
+  }
+  const { data, error } = await supabase
+    .from("period_tracker_articles")
+    .insert(payload.value)
+    .select("*")
+    .single();
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to create article" });
+  }
+  return res.json({ data });
+});
+
+app.put("/api/admin/period-tracker/articles/:id", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const payload = normalizePeriodTrackerArticlePayload(req.body);
+  if (payload.error) {
+    return res.status(400).json({ error: payload.error });
+  }
+  const { data, error } = await supabase
+    .from("period_tracker_articles")
+    .update(payload.value)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to update article" });
+  }
+  return res.json({ data });
+});
+
+app.delete("/api/admin/period-tracker/articles/:id", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const { data, error } = await supabase
+    .from("period_tracker_articles")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .single();
+  if (error || !data) {
+    if (error?.code === "PGRST116") {
+      return res.status(404).json({ error: "Article not found" });
+    }
+    return res.status(400).json({ error: error?.message || "Failed to delete article" });
+  }
+  return res.json({ message: "Article deleted", data });
 });
 
 app.post("/api/v1/period-tracker/symptoms", apiAuthRequired, async (req, res) => {

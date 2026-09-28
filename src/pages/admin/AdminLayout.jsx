@@ -97,6 +97,15 @@ const AdminLayout = ({ children }) => {
             <NavLink to="/admin/testimonials" className="nav-link" onClick={() => setSidebarOpen(false)}>
               Testimonials
             </NavLink>
+            <NavLink to="/admin/posts" className="nav-link" onClick={() => setSidebarOpen(false)}>
+              Community Posts
+            </NavLink>
+            <NavLink to="/admin/period-tracker-articles" className="nav-link" onClick={() => setSidebarOpen(false)}>
+              Health Tip Articles
+            </NavLink>
+            <NavLink to="/admin/period-tracker-options" className="nav-link" onClick={() => setSidebarOpen(false)}>
+              Period Tracker Options
+            </NavLink>
             <NavLink to="/admin/tracker-details" className="nav-link" onClick={() => setSidebarOpen(false)}>
               Tracker Details
             </NavLink>

@@ -189,4 +189,41 @@ export const adminApi = {
     request(
       `/api/v1/jan-aushadhi-kendras?state=${encodeURIComponent(state)}&district=${encodeURIComponent(district)}&pin=${encodeURIComponent(pin)}&name=${encodeURIComponent(name)}&limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`
     ),
+  getAdminPosts: ({ status = "", limit = 50, offset = 0 } = {}) =>
+    request(
+      `/api/admin/posts?status=${encodeURIComponent(status)}&limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`
+    ),
+  getAdminPostDetail: (id) => request(`/api/admin/posts/${id}`),
+  updateAdminPostStatus: (id, status) =>
+    request(`/api/admin/posts/${id}/status`, {
+      method: "PUT",
+      body: JSON.stringify({ status }),
+    }),
+  deleteAdminPost: (id) => request(`/api/admin/posts/${id}`, { method: "DELETE" }),
+  getAdminPeriodTrackerOptions: () => request(`/api/admin/period-tracker/options`),
+  createAdminPeriodTrackerOption: (payload) =>
+    request(`/api/admin/period-tracker/options`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateAdminPeriodTrackerOption: (id, payload) =>
+    request(`/api/admin/period-tracker/options/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  deleteAdminPeriodTrackerOption: (id) =>
+    request(`/api/admin/period-tracker/options/${id}`, { method: "DELETE" }),
+  getAdminPeriodTrackerArticles: () => request(`/api/admin/period-tracker/articles`),
+  createAdminPeriodTrackerArticle: (payload) =>
+    request(`/api/admin/period-tracker/articles`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateAdminPeriodTrackerArticle: (id, payload) =>
+    request(`/api/admin/period-tracker/articles/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  deleteAdminPeriodTrackerArticle: (id) =>
+    request(`/api/admin/period-tracker/articles/${id}`, { method: "DELETE" }),
 };
