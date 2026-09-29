@@ -5371,6 +5371,16 @@ app.get("/api/v1/cycle-snaps", apiAuthOptional, async (req, res) => {
     req.user?.id || null,
   ).catch(() => ({ likeCounts: {}, dislikeCounts: {}, commentCounts: {}, myReactions: {} }));
 
+  let savedByMeSet = new Set();
+  if (req.user?.id && snapIds.length) {
+    const { data: mySaves } = await supabase
+      .from("cycle_snap_saves")
+      .select("snap_id")
+      .eq("user_id", req.user.id)
+      .in("snap_id", snapIds);
+    savedByMeSet = new Set((mySaves || []).map((row) => row.snap_id));
+  }
+
   const rows = (data || []).map((row) => ({
     ...row,
     author: usersMap[row.user_id] || null,
@@ -5379,8 +5389,75 @@ app.get("/api/v1/cycle-snaps", apiAuthOptional, async (req, res) => {
     dislike_count: dislikeCounts[row.id] || 0,
     comment_count: commentCounts[row.id] || 0,
     my_reaction: myReactions[row.id] || null,
+    saved_by_me: savedByMeSet.has(row.id),
   }));
   return res.json({ data: rows, meta: { limit, offset, mine, status: status || null } });
+});
+
+// Registered before "/:id" below so "saved" isn't swallowed as a snap id.
+app.get("/api/v1/cycle-snaps/saved", apiAuthRequired, async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+
+  const { data: saves, error: savesError } = await supabase
+    .from("cycle_snap_saves")
+    .select("snap_id, created_at")
+    .eq("user_id", req.user.id)
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (savesError) {
+    return res.status(400).json({ error: savesError.message });
+  }
+
+  const snapIds = (saves || []).map((s) => s.snap_id);
+  if (!snapIds.length) {
+    return res.json({ data: [], meta: { limit, offset } });
+  }
+
+  const { data: snaps, error: snapsError } = await supabase
+    .from("cycle_snaps")
+    .select("*")
+    .in("id", snapIds)
+    .eq("status", "approved");
+  if (snapsError) {
+    return res.status(400).json({ error: snapsError.message });
+  }
+
+  const userIds = Array.from(new Set((snaps || []).map((row) => row.user_id).filter(Boolean)));
+  let usersMap = {};
+  let customersMap = {};
+  if (userIds.length) {
+    const [{ data: usersData }, { data: customersData }] = await Promise.all([
+      supabase.from("users").select("id, email, role, is_active, created_at").in("id", userIds),
+      supabase.from("customers").select("id, user_id, name, phone, status, notes, created_at").in("user_id", userIds),
+    ]);
+    usersMap = Object.fromEntries((usersData || []).map((u) => [u.id, u]));
+    customersMap = Object.fromEntries((customersData || []).map((c) => [c.user_id, c]));
+  }
+
+  const { likeCounts, dislikeCounts, commentCounts, myReactions } = await getSnapCounts(
+    snapIds,
+    req.user.id,
+  ).catch(() => ({ likeCounts: {}, dislikeCounts: {}, commentCounts: {}, myReactions: {} }));
+
+  // Preserve save order (most recently saved first), not table order.
+  const snapsById = Object.fromEntries((snaps || []).map((row) => [row.id, row]));
+  const rows = snapIds
+    .map((id) => snapsById[id])
+    .filter(Boolean)
+    .map((row) => ({
+      ...row,
+      author: usersMap[row.user_id] || null,
+      customer: customersMap[row.user_id] || null,
+      like_count: likeCounts[row.id] || 0,
+      dislike_count: dislikeCounts[row.id] || 0,
+      comment_count: commentCounts[row.id] || 0,
+      my_reaction: myReactions[row.id] || null,
+      saved_by_me: true,
+    }));
+
+  return res.json({ data: rows, meta: { limit, offset } });
 });
 
 app.get("/api/v1/cycle-snaps/:id", apiAuthOptional, async (req, res) => {
@@ -5400,6 +5477,17 @@ app.get("/api/v1/cycle-snaps/:id", apiAuthOptional, async (req, res) => {
     req.user?.id || null,
   ).catch(() => ({ likeCounts: {}, dislikeCounts: {}, commentCounts: {}, myReactions: {} }));
 
+  let savedByMe = false;
+  if (req.user?.id) {
+    const { data: mySave } = await supabase
+      .from("cycle_snap_saves")
+      .select("snap_id")
+      .eq("snap_id", id)
+      .eq("user_id", req.user.id)
+      .maybeSingle();
+    savedByMe = !!mySave;
+  }
+
   return res.json({
     data: {
       ...data,
@@ -5408,6 +5496,47 @@ app.get("/api/v1/cycle-snaps/:id", apiAuthOptional, async (req, res) => {
       dislike_count: dislikeCounts[id] || 0,
       comment_count: commentCounts[id] || 0,
       my_reaction: myReactions[id] || null,
+      saved_by_me: savedByMe,
+    },
+  });
+});
+
+app.post("/api/v1/cycle-snaps/:id/save", apiAuthRequired, async (req, res) => {
+  const { id } = req.params;
+  const { data: snap } = await supabase.from("cycle_snaps").select("id, status").eq("id", id).maybeSingle();
+  if (!snap || snap.status !== "approved") {
+    return res.status(404).json({ error: "Cycle snap not found" });
+  }
+
+  const { data: existingSave } = await supabase
+    .from("cycle_snap_saves")
+    .select("snap_id")
+    .eq("snap_id", id)
+    .eq("user_id", req.user.id)
+    .maybeSingle();
+
+  if (existingSave) {
+    const { error: deleteError } = await supabase
+      .from("cycle_snap_saves")
+      .delete()
+      .eq("snap_id", id)
+      .eq("user_id", req.user.id);
+    if (deleteError) {
+      return res.status(400).json({ error: deleteError.message });
+    }
+  } else {
+    const { error: insertError } = await supabase
+      .from("cycle_snap_saves")
+      .insert({ snap_id: id, user_id: req.user.id });
+    if (insertError) {
+      return res.status(400).json({ error: insertError.message });
+    }
+  }
+
+  return res.json({
+    data: {
+      snap_id: id,
+      saved: !existingSave,
     },
   });
 });
