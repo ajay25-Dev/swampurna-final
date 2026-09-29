@@ -226,4 +226,33 @@ export const adminApi = {
     }),
   deleteAdminPeriodTrackerArticle: (id) =>
     request(`/api/admin/period-tracker/articles/${id}`, { method: "DELETE" }),
+  getContentLibraryCategories: () => request(`/api/admin/content-library/categories`),
+  createContentLibraryCategory: (payload) =>
+    request(`/api/admin/content-library/categories`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateContentLibraryCategory: (id, payload) =>
+    request(`/api/admin/content-library/categories/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  deleteContentLibraryCategory: (id) =>
+    request(`/api/admin/content-library/categories/${id}`, { method: "DELETE" }),
+  getContentLibraryItems: (categoryId = "") =>
+    request(
+      `/api/admin/content-library/items${categoryId ? `?category_id=${encodeURIComponent(categoryId)}` : ""}`
+    ),
+  createContentLibraryItem: (payload) =>
+    request(`/api/admin/content-library/items`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateContentLibraryItem: (id, payload) =>
+    request(`/api/admin/content-library/items/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  deleteContentLibraryItem: (id) =>
+    request(`/api/admin/content-library/items/${id}`, { method: "DELETE" }),
 };

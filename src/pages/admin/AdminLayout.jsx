@@ -100,6 +100,9 @@ const AdminLayout = ({ children }) => {
             <NavLink to="/admin/posts" className="nav-link" onClick={() => setSidebarOpen(false)}>
               Community Posts
             </NavLink>
+            <NavLink to="/admin/content-library" className="nav-link" onClick={() => setSidebarOpen(false)}>
+              Content Library
+            </NavLink>
             <NavLink to="/admin/period-tracker-articles" className="nav-link" onClick={() => setSidebarOpen(false)}>
               Health Tip Articles
             </NavLink>

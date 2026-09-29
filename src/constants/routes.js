@@ -12,6 +12,7 @@ export const ROUTES = [
     { path: '/admin/contact-submissions', loader: () => import('../pages/admin/ContactSubmissions') },
     { path: '/admin/event-registrations', loader: () => import('../pages/admin/EventRegistrations') },
     { path: '/admin/posts', loader: () => import('../pages/admin/Posts') },
+    { path: '/admin/content-library', loader: () => import('../pages/admin/ContentLibrary') },
     { path: '/admin/period-tracker-articles', loader: () => import('../pages/admin/PeriodTrackerArticles') },
     { path: '/admin/period-tracker-options', loader: () => import('../pages/admin/PeriodTrackerOptions') },
     { path: '/admin/pages/:slug', loader: () => import('../pages/admin/PageEditor') },

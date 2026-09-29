@@ -3099,6 +3099,7 @@ app.get("/api/v1/posts", apiAuthOptional, async (req, res) => {
   }));
 
   let likedByMeSet = new Set();
+  let savedByMeSet = new Set();
   if (req.user?.id && postIds.length) {
     const { data: myLikes } = await supabase
       .from("post_likes")
@@ -3106,6 +3107,13 @@ app.get("/api/v1/posts", apiAuthOptional, async (req, res) => {
       .eq("user_id", req.user.id)
       .in("post_id", postIds);
     likedByMeSet = new Set((myLikes || []).map((row) => row.post_id));
+
+    const { data: mySaves } = await supabase
+      .from("post_saves")
+      .select("post_id")
+      .eq("user_id", req.user.id)
+      .in("post_id", postIds);
+    savedByMeSet = new Set((mySaves || []).map((row) => row.post_id));
   }
 
   const userIds = Array.from(new Set((posts || []).map((p) => p.user_id).filter(Boolean)));
@@ -3127,7 +3135,81 @@ app.get("/api/v1/posts", apiAuthOptional, async (req, res) => {
     like_count: likeCounts[post.id] || 0,
     comment_count: commentCounts[post.id] || 0,
     liked_by_me: likedByMeSet.has(post.id),
+    saved_by_me: savedByMeSet.has(post.id),
   }));
+
+  return res.json({ data: formatted, meta: { limit, offset } });
+});
+
+// Registered before the "/:id" route below so "saved" isn't swallowed as
+// a post id by that route's wildcard match.
+app.get("/api/v1/posts/saved", apiAuthRequired, async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+
+  const { data: saves, error: savesError } = await supabase
+    .from("post_saves")
+    .select("post_id, created_at")
+    .eq("user_id", req.user.id)
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (savesError) {
+    return res.status(400).json({ error: savesError.message });
+  }
+
+  const postIds = (saves || []).map((s) => s.post_id);
+  if (!postIds.length) {
+    return res.json({ data: [], meta: { limit, offset } });
+  }
+
+  const { data: posts, error: postsError } = await supabase
+    .from("posts")
+    .select("*")
+    .in("id", postIds)
+    .eq("status", "published");
+  if (postsError) {
+    return res.status(400).json({ error: postsError.message });
+  }
+
+  const { likeCounts, commentCounts } = await getPostCounts(postIds).catch(() => ({
+    likeCounts: {},
+    commentCounts: {},
+  }));
+
+  const { data: myLikes } = await supabase
+    .from("post_likes")
+    .select("post_id")
+    .eq("user_id", req.user.id)
+    .in("post_id", postIds);
+  const likedByMeSet = new Set((myLikes || []).map((row) => row.post_id));
+
+  const userIds = Array.from(new Set((posts || []).map((p) => p.user_id).filter(Boolean)));
+  let usersMap = {};
+  if (userIds.length) {
+    const { data: usersData } = await supabase
+      .from("users")
+      .select("id, email, role")
+      .in("id", userIds);
+    usersMap = Object.fromEntries((usersData || []).map((u) => [u.id, u]));
+  }
+  const namesMap = await getCustomerNames(userIds);
+
+  // Preserve save order (most recently saved first), not posts-table order.
+  const postsById = Object.fromEntries((posts || []).map((p) => [p.id, p]));
+  const formatted = postIds
+    .map((postId) => postsById[postId])
+    .filter(Boolean)
+    .map((post) => ({
+      ...post,
+      author: usersMap[post.user_id]
+        ? { ...usersMap[post.user_id], name: namesMap[post.user_id] || null }
+        : null,
+      like_count: likeCounts[post.id] || 0,
+      comment_count: commentCounts[post.id] || 0,
+      liked_by_me: likedByMeSet.has(post.id),
+      saved_by_me: true,
+    }));
 
   return res.json({ data: formatted, meta: { limit, offset } });
 });
@@ -3150,6 +3232,7 @@ app.get("/api/v1/posts/:id", apiAuthOptional, async (req, res) => {
   }));
 
   let likedByMe = false;
+  let savedByMe = false;
   if (req.user?.id) {
     const { data: myLike } = await supabase
       .from("post_likes")
@@ -3158,6 +3241,14 @@ app.get("/api/v1/posts/:id", apiAuthOptional, async (req, res) => {
       .eq("user_id", req.user.id)
       .maybeSingle();
     likedByMe = !!myLike;
+
+    const { data: mySave } = await supabase
+      .from("post_saves")
+      .select("post_id")
+      .eq("post_id", post.id)
+      .eq("user_id", req.user.id)
+      .maybeSingle();
+    savedByMe = !!mySave;
   }
 
   const { data: author } = await supabase
@@ -3174,6 +3265,7 @@ app.get("/api/v1/posts/:id", apiAuthOptional, async (req, res) => {
       like_count: likeCounts[post.id] || 0,
       comment_count: commentCounts[post.id] || 0,
       liked_by_me: likedByMe,
+      saved_by_me: savedByMe,
     },
   });
 });
@@ -3216,6 +3308,46 @@ app.post("/api/v1/posts/:id/like", apiAuthRequired, async (req, res) => {
       post_id: id,
       liked: !existingLike,
       like_count: likeCounts[id] || 0,
+    },
+  });
+});
+
+app.post("/api/v1/posts/:id/save", apiAuthRequired, async (req, res) => {
+  const { id } = req.params;
+  const { data: post } = await supabase.from("posts").select("id, status").eq("id", id).maybeSingle();
+  if (!post || post.status !== "published") {
+    return res.status(404).json({ error: "Post not found" });
+  }
+
+  const { data: existingSave } = await supabase
+    .from("post_saves")
+    .select("post_id")
+    .eq("post_id", id)
+    .eq("user_id", req.user.id)
+    .maybeSingle();
+
+  if (existingSave) {
+    const { error: deleteError } = await supabase
+      .from("post_saves")
+      .delete()
+      .eq("post_id", id)
+      .eq("user_id", req.user.id);
+    if (deleteError) {
+      return res.status(400).json({ error: deleteError.message });
+    }
+  } else {
+    const { error: insertError } = await supabase
+      .from("post_saves")
+      .insert({ post_id: id, user_id: req.user.id });
+    if (insertError) {
+      return res.status(400).json({ error: insertError.message });
+    }
+  }
+
+  return res.json({
+    data: {
+      post_id: id,
+      saved: !existingSave,
     },
   });
 });
@@ -4181,6 +4313,247 @@ app.delete("/api/admin/period-tracker/articles/:id", authRequired, async (req, r
     return res.status(400).json({ error: error?.message || "Failed to delete article" });
   }
   return res.json({ message: "Article deleted", data });
+});
+
+// --- Content Library (comics, videos, animations, photos, guides) ---
+// Admin-managed via PageEditor.jsx's Content Library editor, consumed by
+// the app's Content Library screens (replaces the old plain-article-only
+// DynamicCommunityScreen / News Categories feed).
+
+function normalizeContentLibraryItemPayload(body) {
+  const categoryId = String(body?.category_id || "").trim();
+  const type = String(body?.type || "").trim().toLowerCase();
+  const title = String(body?.title || "").trim();
+
+  const validTypes = ["video", "comic", "animation", "photo", "guide"];
+  if (!categoryId || !validTypes.includes(type) || !title) {
+    return { error: "category_id, a valid type, and title are required" };
+  }
+
+  const rawImageUrls = Array.isArray(body?.image_urls) ? body.image_urls : [];
+  const imageUrls = rawImageUrls
+    .map((url) => String(url || "").trim())
+    .filter(Boolean);
+
+  const rawPhases = Array.isArray(body?.phases) ? body.phases : [];
+  const phases = rawPhases
+    .map((phase) => ({
+      title: String(phase?.title || "").trim(),
+      body: String(phase?.body || "").trim(),
+      image_url: phase?.image_url ? String(phase.image_url).trim() : null,
+    }))
+    .filter((phase) => phase.title || phase.body);
+
+  return {
+    value: {
+      category_id: categoryId,
+      type,
+      title,
+      description: body?.description ? String(body.description).trim() : null,
+      thumbnail_url: body?.thumbnail_url ? String(body.thumbnail_url).trim() : null,
+      media_url: body?.media_url ? String(body.media_url).trim() : null,
+      image_urls: imageUrls,
+      phases,
+      status: body?.status === "draft" ? "draft" : "published",
+      sort_order: Number.isFinite(Number(body?.sort_order)) ? Number(body.sort_order) : 0,
+    },
+  };
+}
+
+// Categories (admin)
+app.get("/api/admin/content-library/categories", authRequired, async (_req, res) => {
+  const { data, error } = await supabase
+    .from("content_library_categories")
+    .select("*")
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  return res.json({ data: data || [] });
+});
+
+app.post("/api/admin/content-library/categories", authRequired, async (req, res) => {
+  const { name, sort_order, is_active } = req.body || {};
+  const cleanName = String(name || "").trim();
+  if (!cleanName) {
+    return res.status(400).json({ error: "name is required" });
+  }
+  const cleanSlug = slugify(cleanName);
+  if (!cleanSlug) {
+    return res.status(400).json({ error: "Invalid category name" });
+  }
+
+  const { data, error } = await supabase
+    .from("content_library_categories")
+    .insert({
+      name: cleanName,
+      slug: cleanSlug,
+      sort_order: Number.isFinite(Number(sort_order)) ? Number(sort_order) : 0,
+      is_active: is_active === undefined ? true : !!is_active,
+    })
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to create category" });
+  }
+  return res.json({ data });
+});
+
+app.put("/api/admin/content-library/categories/:id", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const { name, sort_order, is_active } = req.body || {};
+  const updates = {};
+
+  if (name !== undefined) {
+    const cleanName = String(name || "").trim();
+    if (!cleanName) return res.status(400).json({ error: "name cannot be empty" });
+    updates.name = cleanName;
+    updates.slug = slugify(cleanName);
+  }
+  if (sort_order !== undefined) updates.sort_order = Number.isFinite(Number(sort_order)) ? Number(sort_order) : 0;
+  if (is_active !== undefined) updates.is_active = !!is_active;
+
+  const { data, error } = await supabase
+    .from("content_library_categories")
+    .update(updates)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to update category" });
+  }
+  return res.json({ data });
+});
+
+app.delete("/api/admin/content-library/categories/:id", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const { error } = await supabase.from("content_library_categories").delete().eq("id", id);
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  return res.json({ ok: true });
+});
+
+// Items (admin)
+app.get("/api/admin/content-library/items", authRequired, async (req, res) => {
+  let query = supabase
+    .from("content_library_items")
+    .select("*")
+    .order("category_id", { ascending: true })
+    .order("sort_order", { ascending: true });
+
+  const categoryId = req.query.category_id ? String(req.query.category_id).trim() : "";
+  if (categoryId) query = query.eq("category_id", categoryId);
+
+  const { data, error } = await query;
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  return res.json({ data: data || [] });
+});
+
+app.post("/api/admin/content-library/items", authRequired, async (req, res) => {
+  const payload = normalizeContentLibraryItemPayload(req.body);
+  if (payload.error) {
+    return res.status(400).json({ error: payload.error });
+  }
+  const { data, error } = await supabase
+    .from("content_library_items")
+    .insert(payload.value)
+    .select("*")
+    .single();
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to create item" });
+  }
+  return res.json({ data });
+});
+
+app.put("/api/admin/content-library/items/:id", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const payload = normalizeContentLibraryItemPayload(req.body);
+  if (payload.error) {
+    return res.status(400).json({ error: payload.error });
+  }
+  const { data, error } = await supabase
+    .from("content_library_items")
+    .update(payload.value)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error || !data) {
+    return res.status(400).json({ error: error?.message || "Failed to update item" });
+  }
+  return res.json({ data });
+});
+
+app.delete("/api/admin/content-library/items/:id", authRequired, async (req, res) => {
+  const { id } = req.params;
+  const { data, error } = await supabase
+    .from("content_library_items")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .single();
+  if (error || !data) {
+    if (error?.code === "PGRST116") {
+      return res.status(404).json({ error: "Item not found" });
+    }
+    return res.status(400).json({ error: error?.message || "Failed to delete item" });
+  }
+  return res.json({ message: "Item deleted", data });
+});
+
+// Categories + items (public, consumed by the Flutter app)
+app.get("/api/public/content-library/categories", async (_req, res) => {
+  const { data, error } = await supabase
+    .from("content_library_categories")
+    .select("*")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  return res.json({ data: data || [] });
+});
+
+app.get("/api/public/content-library/items", async (req, res) => {
+  let query = supabase
+    .from("content_library_items")
+    .select("*")
+    .eq("status", "published")
+    .order("sort_order", { ascending: true });
+
+  const categoryId = req.query.category_id ? String(req.query.category_id).trim() : "";
+  if (categoryId) query = query.eq("category_id", categoryId);
+
+  const type = req.query.type ? String(req.query.type).trim().toLowerCase() : "";
+  if (type) query = query.eq("type", type);
+
+  const { data, error } = await query;
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  return res.json({ data: data || [] });
+});
+
+app.get("/api/public/content-library/items/:id", async (req, res) => {
+  const { id } = req.params;
+  const { data, error } = await supabase
+    .from("content_library_items")
+    .select("*")
+    .eq("id", id)
+    .eq("status", "published")
+    .maybeSingle();
+  if (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  if (!data) {
+    return res.status(404).json({ error: "Item not found" });
+  }
+  return res.json({ data });
 });
 
 app.post("/api/v1/period-tracker/symptoms", apiAuthRequired, async (req, res) => {
