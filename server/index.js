@@ -2659,6 +2659,43 @@ app.post("/api/v1/auth/login", async (req, res) => {
   });
 });
 
+// Lets the app decide, before asking for anything else, whether a
+// returning user can skip straight to PIN entry instead of OTP - e.g.
+// after reinstalling the app, where the local "has PIN" flag is gone even
+// though the account itself still has a PIN set server-side. Deliberately
+// never reveals whether the email is registered at all (always 200 with
+// has_pin: false for unknown/inactive/no-pin accounts) to avoid turning
+// this into an account-enumeration endpoint.
+app.post("/api/v1/auth/pin-status", async (req, res) => {
+  const { email } = req.body || {};
+  if (!email) {
+    return res.status(400).json({ error: "email is required" });
+  }
+  const cleanEmail = String(email).trim().toLowerCase();
+  const ip = getClientIp(req);
+
+  const rate = consumeAuthRateLimit({
+    key: `pin-status:${ip}:${cleanEmail}`,
+    limit: OTP_SEND_MAX_PER_WINDOW,
+    windowMs: AUTH_RATE_WINDOW_MS,
+  });
+  if (!rate.allowed) {
+    return res.status(429).json({
+      error: "Too many requests. Try again later.",
+      retry_after_seconds: rate.retryAfterSeconds,
+    });
+  }
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("pin_enabled, pin_hash, is_active")
+    .eq("email", cleanEmail)
+    .maybeSingle();
+
+  const hasPin = !!(user && user.is_active && user.pin_enabled && user.pin_hash);
+  return res.json({ has_pin: hasPin });
+});
+
 app.post("/api/v1/auth/login/pin", async (req, res) => {
   const { email, pin } = req.body || {};
   if (!email || !pin) {
