@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import styled from "styled-components";
 import AdminLayout from "./AdminLayout";
 import { adminApi } from "../../lib/adminApi";
+import RichTextEditor from "../../components/admin/RichTextEditor";
 
 const TYPES = [
   { value: "video", label: "Video" },
@@ -25,6 +26,14 @@ const emptyItemForm = {
 };
 
 const emptyPhase = { title: "", body: "", image_url: "" };
+
+// Description is stored as HTML (from RichTextEditor); the list preview
+// shows plain text so tags don't appear literally.
+const stripHtml = (html) => {
+  const div = document.createElement("div");
+  div.innerHTML = html || "";
+  return div.textContent || div.innerText || "";
+};
 
 const ContentLibrary = () => {
   const [categories, setCategories] = useState([]);
@@ -410,10 +419,9 @@ const ContentLibrary = () => {
 
               <label className="content-label">
                 Description
-                <textarea
-                  rows={3}
+                <RichTextEditor
                   value={itemForm.description || ""}
-                  onChange={(e) => handleItemChange("description", e.target.value)}
+                  onChange={(html) => handleItemChange("description", html)}
                 />
               </label>
 
@@ -534,7 +542,7 @@ const ContentLibrary = () => {
                       <span className="badge type">{item.type}</span>
                       <span className={`badge ${item.status}`}>{item.status}</span>
                     </div>
-                    <p className="content-preview">{item.description}</p>
+                    <p className="content-preview">{stripHtml(item.description)}</p>
                     <div className="meta">
                       <span>category: {categoryName(item.category_id)}</span>
                       <span>sort: {item.sort_order}</span>
