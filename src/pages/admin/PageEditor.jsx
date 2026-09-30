@@ -867,6 +867,7 @@ const PageEditor = () => {
                   {isImpactStory && (
                     <div className="impact-description">
                       <RichTextEditor
+                        key={item.id}
                         value={item.description || ""}
                         onChange={(val) => updateItemField(item.id, "description", val)}
                       />
@@ -1007,6 +1008,7 @@ const PageEditor = () => {
                   {isNewsArticles && (
                     <div className="impact-description">
                       <RichTextEditor
+                        key={item.id}
                         value={item.description || ""}
                         onChange={(val) => updateItemField(item.id, "description", val)}
                       />
@@ -1143,6 +1145,7 @@ const PageEditor = () => {
                   {isCompetitionEvent && (
                     <div className="impact-description">
                       <RichTextEditor
+                        key={item.id}
                         value={item.description || ""}
                         onChange={(val) => updateItemField(item.id, "description", val)}
                       />
@@ -1943,6 +1946,7 @@ const PageEditor = () => {
                   {isEventSection && (
                     <div className="event-body">
                       <RichTextEditor
+                        key={item.id}
                         value={item.description || ""}
                         onChange={(val) => updateItemField(item.id, "description", val)}
                       />

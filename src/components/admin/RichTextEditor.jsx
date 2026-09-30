@@ -4,36 +4,31 @@ import styled from "styled-components";
 // Minimal contentEditable-based rich text editor (bold/italic/headings/
 // lists/quote), shared between PageEditor.jsx and any other admin editor
 // that needs formatted text stored as an HTML string.
+// Uncontrolled by design: once mounted, the contentEditable DOM node is the
+// single source of truth for what's on screen, and React never writes back
+// into it. `value` only seeds the *initial* content (mount effect, empty
+// deps). Any scheme that re-syncs from `value` on every change - even a
+// "did we just emit this ourselves" guard - is fighting React's own render
+// timing: a parent that stores several fields on one state object (title,
+// description, etc.) produces a fresh `value` reference on every unrelated
+// keystroke or re-render, and the moment that effect's guard has a gap, it
+// stamps editorRef.current.innerHTML back over whatever the user just
+// typed or pasted, wiping the field the instant they click back into it.
+// Owning the DOM outright removes that whole failure class. To load a
+// different item's content, mount a fresh instance - render this with
+// `key={item.id ?? "new"}` from the parent so switching items remounts it.
 const RichTextEditor = ({ value, onChange }) => {
   const editorRef = useRef(null);
-  // Remembers the HTML we last told the parent about, so the sync effect
-  // below can tell "value changed because we typed/pasted" apart from
-  // "value changed because the parent loaded a different item". Without
-  // this, every keystroke's onChange -> setState -> re-render round trip
-  // re-ran the effect below and force-reset the DOM from the (possibly
-  // slightly stale, due to React batching) `value` prop, which reset the
-  // cursor to the start and could clobber text typed/pasted a moment
-  // earlier - especially noticeable typing right after a paste.
-  // Sentinel (not "") so the mount run below always performs its first
-  // sync. Seeding this with the initial `value` instead meant the very
-  // first effect run always saw value === lastEmitted.current and bailed
-  // out before ever writing to editorRef.current.innerHTML - so opening
-  // an existing item (non-empty `value` on mount) rendered a blank
-  // editor even though the description was intact in state, which reads
-  // exactly like "my content got removed" the moment you click into it.
-  const lastEmitted = useRef(null);
 
   useEffect(() => {
-    if (!editorRef.current) return;
-    if (value === lastEmitted.current) return;
-    if (editorRef.current.innerHTML !== (value || "")) {
+    if (editorRef.current) {
       editorRef.current.innerHTML = value || "";
     }
-    lastEmitted.current = value || "";
-  }, [value]);
+    // Intentionally empty deps: this is the one-time initial paint only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const emit = (html) => {
-    lastEmitted.current = html;
     onChange(html);
   };
 

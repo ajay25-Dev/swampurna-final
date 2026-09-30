@@ -488,6 +488,7 @@ const ContentLibrary = () => {
               <label className="content-label">
                 Description
                 <RichTextEditor
+                  key={itemForm.id ?? "new"}
                   value={itemForm.description || ""}
                   onChange={(html) => handleItemChange("description", html)}
                 />
