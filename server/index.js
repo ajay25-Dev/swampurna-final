@@ -1028,9 +1028,11 @@ async function getTrackerSummaryForUser({ userId, month }) {
     return null;
   }
 
+  // See the same fix in the /period-tracker/summary route below for why
+  // explicit settings must win over the historical-logs-derived guess.
   const adaptive = deriveAdaptiveCycleMetricsFromLogs(logsData || []);
-  const resolvedCycleLength = adaptive.adaptive_cycle_length_days || settings.cycle_length_days || 28;
-  const resolvedPeriodLength = adaptive.adaptive_period_length_days || settings.period_length_days || 5;
+  const resolvedCycleLength = settings.cycle_length_days || adaptive.adaptive_cycle_length_days || 28;
+  const resolvedPeriodLength = settings.period_length_days || adaptive.adaptive_period_length_days || 5;
 
   const data = buildPeriodTrackerSummary({
     isoMonth: targetMonth,
@@ -3793,9 +3795,16 @@ app.get("/api/v1/period-tracker/summary", apiAuthRequired, async (req, res) => {
     return res.status(404).json({ error: "Period tracker setup not found. Complete setup first." });
   }
 
+  // Explicit settings (from initial setup or a later edit) must win over
+  // the "adaptive" guess derived from historical period_tracker_logs rows.
+  // Those log rows are only ever written once, during initial setup - an
+  // edit via PUT /period-tracker/setup updates the settings row but never
+  // adds a fresh log entry, so the old priority order (adaptive first)
+  // meant an edited cycle/period length was silently ignored in favor of
+  // the stale original value baked into that one log row.
   const adaptive = deriveAdaptiveCycleMetricsFromLogs(logsData || []);
-  const resolvedCycleLength = adaptive.adaptive_cycle_length_days || settings.cycle_length_days || 28;
-  const resolvedPeriodLength = adaptive.adaptive_period_length_days || settings.period_length_days || 5;
+  const resolvedCycleLength = settings.cycle_length_days || adaptive.adaptive_cycle_length_days || 28;
+  const resolvedPeriodLength = settings.period_length_days || adaptive.adaptive_period_length_days || 5;
 
   const summary = buildPeriodTrackerSummary({
     isoMonth: targetMonth,
