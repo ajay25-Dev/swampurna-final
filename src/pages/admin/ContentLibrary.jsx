@@ -414,7 +414,12 @@ const ContentLibrary = () => {
         <section className="items-section">
           <div className="section-head">
             <h2>Items</h2>
-            <button className="primary" onClick={openCreateItem} disabled={categories.length === 0}>
+            <button
+              className="primary"
+              onClick={openCreateItem}
+              disabled={categories.length === 0 || !!itemForm}
+              title={itemForm ? "Finish or cancel the open item form first" : undefined}
+            >
               Add Item
             </button>
           </div>
@@ -647,8 +652,22 @@ const ContentLibrary = () => {
                     </div>
                   </div>
                   <div className="actions">
-                    <button onClick={() => openEditItem(item)}>Edit</button>
-                    <button className="delete" onClick={() => handleDeleteItem(item)}>
+                    <button
+                      onClick={() => openEditItem(item)}
+                      disabled={!!itemForm && itemForm.id !== item.id}
+                      title={
+                        itemForm && itemForm.id !== item.id
+                          ? "Finish or cancel the open item form first"
+                          : undefined
+                      }
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="delete"
+                      onClick={() => handleDeleteItem(item)}
+                      disabled={!!itemForm && itemForm.id !== item.id}
+                    >
                       Delete
                     </button>
                   </div>

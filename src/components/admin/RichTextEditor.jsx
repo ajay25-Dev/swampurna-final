@@ -14,7 +14,14 @@ const RichTextEditor = ({ value, onChange }) => {
   // slightly stale, due to React batching) `value` prop, which reset the
   // cursor to the start and could clobber text typed/pasted a moment
   // earlier - especially noticeable typing right after a paste.
-  const lastEmitted = useRef(value || "");
+  // Sentinel (not "") so the mount run below always performs its first
+  // sync. Seeding this with the initial `value` instead meant the very
+  // first effect run always saw value === lastEmitted.current and bailed
+  // out before ever writing to editorRef.current.innerHTML - so opening
+  // an existing item (non-empty `value` on mount) rendered a blank
+  // editor even though the description was intact in state, which reads
+  // exactly like "my content got removed" the moment you click into it.
+  const lastEmitted = useRef(null);
 
   useEffect(() => {
     if (!editorRef.current) return;
