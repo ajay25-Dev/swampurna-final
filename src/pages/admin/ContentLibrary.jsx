@@ -485,14 +485,14 @@ const ContentLibrary = () => {
                 </label>
               </div>
 
-              <label className="content-label">
+              <div className="content-label">
                 Description
                 <RichTextEditor
                   key={itemForm.id ?? "new"}
                   value={itemForm.description || ""}
                   onChange={(html) => handleItemChange("description", html)}
                 />
-              </label>
+              </div>
 
               <label className="content-label">
                 Thumbnail (shown on the library grid)
@@ -862,7 +862,8 @@ const Wrap = styled.div`
     flex-direction: row;
   }
 
-  label.content-label {
+  label.content-label,
+  div.content-label {
     display: grid;
   }
 
