@@ -6,19 +6,35 @@ import styled from "styled-components";
 // that needs formatted text stored as an HTML string.
 const RichTextEditor = ({ value, onChange }) => {
   const editorRef = useRef(null);
+  // Remembers the HTML we last told the parent about, so the sync effect
+  // below can tell "value changed because we typed/pasted" apart from
+  // "value changed because the parent loaded a different item". Without
+  // this, every keystroke's onChange -> setState -> re-render round trip
+  // re-ran the effect below and force-reset the DOM from the (possibly
+  // slightly stale, due to React batching) `value` prop, which reset the
+  // cursor to the start and could clobber text typed/pasted a moment
+  // earlier - especially noticeable typing right after a paste.
+  const lastEmitted = useRef(value || "");
 
   useEffect(() => {
     if (!editorRef.current) return;
+    if (value === lastEmitted.current) return;
     if (editorRef.current.innerHTML !== (value || "")) {
       editorRef.current.innerHTML = value || "";
     }
+    lastEmitted.current = value || "";
   }, [value]);
+
+  const emit = (html) => {
+    lastEmitted.current = html;
+    onChange(html);
+  };
 
   const runCommand = (command, valueArg = null) => {
     editorRef.current?.focus();
     document.execCommand(command, false, valueArg);
     if (editorRef.current) {
-      onChange(editorRef.current.innerHTML);
+      emit(editorRef.current.innerHTML);
     }
   };
 
@@ -29,7 +45,7 @@ const RichTextEditor = ({ value, onChange }) => {
     const text = e.clipboardData.getData("text/plain");
     document.execCommand("insertText", false, text);
     if (editorRef.current) {
-      onChange(editorRef.current.innerHTML);
+      emit(editorRef.current.innerHTML);
     }
   };
 
@@ -55,7 +71,7 @@ const RichTextEditor = ({ value, onChange }) => {
         className="rte-editor"
         contentEditable
         suppressContentEditableWarning
-        onInput={(e) => onChange(e.currentTarget.innerHTML)}
+        onInput={(e) => emit(e.currentTarget.innerHTML)}
         onPaste={onPaste}
       />
     </Wrap>

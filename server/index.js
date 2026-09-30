@@ -4,7 +4,9 @@ import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { existsSync } from "fs";
+import { existsSync, createReadStream } from "fs";
+import { unlink } from "fs/promises";
+import { tmpdir } from "os";
 import { createHash } from "crypto";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1084,6 +1086,26 @@ app.use(express.json({ limit: "5mb" }));
 app.use(cookieParser());
 
 const upload = multer({ storage: multer.memoryStorage() });
+
+// Separate instance for large media (Content Library videos/animations,
+// which can run several minutes long) - memoryStorage buffers the whole
+// file in the Node process's RAM, which is fine for small images but risks
+// crashing the server on a large video. This one streams to a temp file on
+// disk instead, then streams that to Supabase Storage.
+const uploadLarge = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, tmpdir()),
+    filename: (_req, file, cb) =>
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}-${file.originalname}`),
+  }),
+  // This is just a sanity ceiling, not the real-world limit - Supabase
+  // Storage's own per-bucket "file size limit" setting (Dashboard >
+  // Storage > bucket settings) is enforced server-side regardless of this
+  // value and commonly defaults to something much lower (e.g. 50MB), which
+  // is the most likely reason long videos fail to upload. Raise that
+  // bucket setting if large videos still get rejected after this change.
+  limits: { fileSize: 1024 * 1024 * 1024 },
+});
 
 function signToken(user) {
   return jwt.sign(
@@ -6534,27 +6556,37 @@ app.get("/api/admin/dashboard/overview", authRequired, async (req, res) => {
   }
 });
 
-app.post("/api/media/upload", authRequired, upload.single("file"), async (req, res) => {
+app.post("/api/media/upload", authRequired, uploadLarge.single("file"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "No file uploaded" });
   }
   const fileExt = req.file.originalname.split(".").pop();
   const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
-  const filePath = `${fileName}`;
 
-  const { error } = await supabase.storage
-    .from(MEDIA_BUCKET)
-    .upload(filePath, req.file.buffer, {
-      contentType: req.file.mimetype,
-      upsert: false,
-    });
+  try {
+    const { error } = await supabase.storage
+      .from(MEDIA_BUCKET)
+      .upload(fileName, createReadStream(req.file.path), {
+        contentType: req.file.mimetype,
+        duplex: "half",
+        upsert: false,
+      });
 
-  if (error) {
-    return res.status(400).json({ error: error.message });
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    const { data } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(fileName);
+    return res.json({ url: data.publicUrl, path: fileName });
+  } catch (err) {
+    // Express 4 doesn't forward a rejected promise from an async route
+    // handler anywhere - without this, a thrown error here would be an
+    // unhandled rejection instead of a clean response to the client.
+    return res.status(500).json({ error: err?.message || "Upload failed" });
+  } finally {
+    // Always clean up the temp file, whether the upload succeeded or not.
+    unlink(req.file.path).catch(() => {});
   }
-
-  const { data } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(filePath);
-  return res.json({ url: data.publicUrl, path: filePath });
 });
 
 // Serve React frontend in production
@@ -6565,6 +6597,18 @@ if (existsSync(distPath)) {
     res.sendFile(join(distPath, "index.html"));
   });
 }
+
+// Catches errors thrown by any route above (e.g. multer rejecting an
+// oversized file with LIMIT_FILE_SIZE) and returns clean JSON instead of
+// Express's default HTML error page, which the frontend can't parse.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  if (err?.code === "LIMIT_FILE_SIZE") {
+    return res.status(413).json({ error: "File is too large to upload." });
+  }
+  console.error("Unhandled error:", err);
+  return res.status(500).json({ error: err?.message || "Internal server error" });
+});
 
 app.listen(PORT, () => {
   // eslint-disable-next-line no-console

@@ -27,6 +27,20 @@ const emptyItemForm = {
 
 const emptyPhase = { title: "", body: "", image_url: "" };
 
+// Pressing Enter in a plain text <input> inside a <form> submits that form
+// by default. In this form that meant hitting Enter after typing the
+// Title (or a phase title, or Sort order) silently saved and closed the
+// form right then - which looked exactly like "the title/description got
+// removed", since the whole form (including whatever wasn't filled in
+// yet) just vanished. Scoped to <input> only, so <textarea> (Phase text)
+// keeps normal Enter-for-newline and the Save button keeps normal
+// Enter-to-activate when focused.
+const preventEnterSubmit = (e) => {
+  if (e.key === "Enter" && e.target.tagName === "INPUT") {
+    e.preventDefault();
+  }
+};
+
 // Description is stored as HTML (from RichTextEditor); the list preview
 // shows plain text so tags don't appear literally.
 const stripHtml = (html) => {
@@ -182,12 +196,53 @@ const ContentLibrary = () => {
     uploadFile(file, "media", (url) => handleItemChange("media_url", url));
   };
 
-  const handleAddImage = (e) => {
+  // Comics are uploaded as one complete PDF (stored in media_url, same
+  // field video/animation use for their file) rather than as separate
+  // image pages - the app's comic viewer renders the PDF directly.
+  const handleComicPdfUpload = (e) => {
     const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
     if (!file) return;
-    uploadFile(file, "image", (url) => {
-      setItemForm((prev) => ({ ...prev, image_urls: [...(prev.image_urls || []), url] }));
-    });
+
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      setError(`${file.name} - comics need a PDF file.`);
+      return;
+    }
+
+    uploadFile(file, "media", (url) => handleItemChange("media_url", url));
+  };
+
+  const handleAddImages = async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = ""; // allow re-selecting the same file(s) later
+    if (!files.length) return;
+
+    const nonImages = files.filter((f) => !f.type.startsWith("image/"));
+    if (nonImages.length) {
+      setError(
+        `${nonImages.map((f) => f.name).join(", ")} - photos need image files (JPG, PNG, WEBP).`
+      );
+      return;
+    }
+
+    setUploadingKey("image");
+    setError("");
+    try {
+      // Sequential, not Promise.all, so pages land in the order they were
+      // selected instead of whichever upload happens to finish first.
+      for (const file of files) {
+        const res = await adminApi.uploadMedia(file);
+        const url = res.url || "";
+        if (url) {
+          setItemForm((prev) => ({ ...prev, image_urls: [...(prev.image_urls || []), url] }));
+        }
+      }
+    } catch (err) {
+      setError(err.message || "Upload failed");
+    } finally {
+      setUploadingKey("");
+    }
   };
 
   const handleRemoveImage = (index) => {
@@ -272,9 +327,9 @@ const ContentLibrary = () => {
       <Wrap>
         <div className="head">
           <div>
-            <h1>Educational Content Library</h1>
+            <h1>Wellness Hub</h1>
             <p>
-              Manage the app's content library - comics, videos, animations, photos and step-by-step
+              Manage the app's Wellness Hub - comics, videos, animations, photos and step-by-step
               guides shown to users, organized by category.
             </p>
           </div>
@@ -292,7 +347,11 @@ const ContentLibrary = () => {
           </div>
 
           {categoryForm && (
-            <form className="form-card inline" onSubmit={handleSaveCategory}>
+            <form
+              className="form-card inline"
+              onSubmit={handleSaveCategory}
+              onKeyDown={preventEnterSubmit}
+            >
               <label>
                 Name
                 <input
@@ -362,7 +421,11 @@ const ContentLibrary = () => {
           {categories.length === 0 && <p className="muted">Add a category first.</p>}
 
           {itemForm && (
-            <form className="form-card" onSubmit={handleSaveItem}>
+            <form
+              className="form-card"
+              onSubmit={handleSaveItem}
+              onKeyDown={preventEnterSubmit}
+            >
               <h3>{itemForm.id ? "Edit Item" : "New Item"}</h3>
               <div className="grid">
                 <label>
@@ -448,15 +511,43 @@ const ContentLibrary = () => {
                 </label>
               )}
 
-              {(itemForm.type === "comic" || itemForm.type === "photo") && (
+              {itemForm.type === "comic" && (
+                <label className="content-label">
+                  Comic PDF (the complete comic, all pages, as one file)
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    onChange={handleComicPdfUpload}
+                    disabled={!!uploadingKey}
+                  />
+                  {uploadingKey === "media" && <span className="msg">Uploading...</span>}
+                  {itemForm.media_url && (
+                    <a href={itemForm.media_url} target="_blank" rel="noreferrer" className="file-name">
+                      {itemForm.media_url}
+                    </a>
+                  )}
+                </label>
+              )}
+
+              {itemForm.type === "photo" && (
                 <div className="content-label">
-                  <span>{itemForm.type === "comic" ? "Comic pages (in order)" : "Photos"}</span>
-                  <input type="file" accept="image/*" onChange={handleAddImage} disabled={!!uploadingKey} />
+                  <span>Photos</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleAddImages}
+                    disabled={!!uploadingKey}
+                  />
+                  <span className="msg">
+                    Select multiple image files at once (hold Ctrl/Cmd to multi-select) - they'll be
+                    added in the order you pick them.
+                  </span>
                   {uploadingKey === "image" && <span className="msg">Uploading...</span>}
                   <div className="image-list">
                     {(itemForm.image_urls || []).map((url, i) => (
                       <div className="image-item" key={`${url}-${i}`}>
-                        <img src={url} alt={`page ${i + 1}`} />
+                        <img src={url} alt={`photo ${i + 1}`} />
                         <button type="button" onClick={() => handleRemoveImage(i)}>
                           Remove
                         </button>
@@ -547,8 +638,11 @@ const ContentLibrary = () => {
                       <span>category: {categoryName(item.category_id)}</span>
                       <span>sort: {item.sort_order}</span>
                       {item.type === "guide" && <span>{(item.phases || []).length} phase(s)</span>}
-                      {(item.type === "comic" || item.type === "photo") && (
+                      {item.type === "photo" && (
                         <span>{(item.image_urls || []).length} image(s)</span>
+                      )}
+                      {item.type === "comic" && (
+                        <span>{item.media_url ? "PDF uploaded" : "No PDF yet"}</span>
                       )}
                     </div>
                   </div>
