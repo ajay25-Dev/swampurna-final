@@ -2959,6 +2959,9 @@ app.post("/api/v1/customers/onboarding", apiAuthRequired, async (req, res) => {
     birth_year,
     pregnancy_status,
     using_for,
+    privacy_policy_accepted,
+    privacy_policy_version,
+    privacy_policy_accepted_at,
   } = req.body || {};
 
   const updates = { user_id: req.user.id };
@@ -3001,10 +3004,28 @@ app.post("/api/v1/customers/onboarding", apiAuthRequired, async (req, res) => {
     updates.using_for = val;
   }
 
+  // Privacy consent is recorded as a fact (accepted, which policy version,
+  // when) rather than just a device-local "don't show this again" flag -
+  // only accept === true is ever stored, so there's no way to record a
+  // customer as having "declined" consent they're required to give to use
+  // the app at all.
+  if (privacy_policy_accepted === true) {
+    updates.privacy_policy_accepted = true;
+    updates.privacy_policy_version = privacy_policy_version
+      ? String(privacy_policy_version).trim().slice(0, 50)
+      : null;
+    const acceptedAt = privacy_policy_accepted_at
+      ? new Date(privacy_policy_accepted_at)
+      : new Date();
+    updates.privacy_policy_accepted_at = Number.isNaN(acceptedAt.getTime())
+      ? new Date().toISOString()
+      : acceptedAt.toISOString();
+  }
+
   const changedKeys = Object.keys(updates).filter((key) => key !== "user_id");
   if (changedKeys.length === 0) {
     return res.status(400).json({
-      error: "No onboarding fields provided. Send onboarding_source, birth_year, pregnancy_status, or using_for.",
+      error: "No onboarding fields provided. Send onboarding_source, birth_year, pregnancy_status, using_for, or privacy_policy_accepted.",
     });
   }
 
